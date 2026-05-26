@@ -6,6 +6,7 @@ import { RoomsModule } from './rooms/rooms.module';
 import { ServiceTypesModule } from './service-types/service-types.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { RecommendationsModule } from './recommendations/recommendations.module';
+import { RealtimeModule } from './realtime/realtime.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { RecommendationsModule } from './recommendations/recommendations.module'
     ServiceTypesModule,
     AnalyticsModule,
     RecommendationsModule,
+    RealtimeModule,
   ],
   controllers: [AppController],
   providers: [AppService],
