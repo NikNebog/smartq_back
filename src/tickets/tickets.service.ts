@@ -19,9 +19,9 @@ export class TicketsService {
 
     // Считаем ETA
     const waitingTickets = await this.prisma.ticket.count({
-      where: { 
+      where: {
         serviceTypeId,
-        status: { in: ['waiting', 'called'] }
+        status: { in: ['waiting', 'called'] },
       },
     });
 
@@ -107,11 +107,97 @@ export class TicketsService {
   async findOne(id: number) {
     return this.prisma.ticket.findUnique({
       where: { id },
-      include: { 
-        serviceType: true, 
+      include: {
+        serviceType: true,
         room: true,
-        events: { orderBy: { createdAt: 'asc' } }
+        events: { orderBy: { createdAt: 'asc' } },
       },
     });
+  }
+
+  // Вызвать пациента
+  async callTicket(id: number) {
+    const ticket = await this.prisma.ticket.update({
+      where: { id },
+      data: { status: 'called', calledAt: new Date() },
+    });
+    await this.prisma.queueEvent.create({
+      data: {
+        ticketId: id,
+        eventType: 'ticket_called',
+        oldStatus: 'waiting',
+        newStatus: 'called',
+      },
+    });
+    return ticket;
+  }
+
+  // Начать обслуживание
+  async startService(id: number) {
+    const ticket = await this.prisma.ticket.update({
+      where: { id },
+      data: { status: 'in_service', serviceStartedAt: new Date() },
+    });
+    await this.prisma.queueEvent.create({
+      data: {
+        ticketId: id,
+        eventType: 'service_started',
+        oldStatus: 'called',
+        newStatus: 'in_service',
+      },
+    });
+    return ticket;
+  }
+
+  // Завершить обслуживание
+  async completeTicket(id: number) {
+    const ticket = await this.prisma.ticket.update({
+      where: { id },
+      data: { status: 'completed', completedAt: new Date() },
+    });
+    await this.prisma.queueEvent.create({
+      data: {
+        ticketId: id,
+        eventType: 'service_completed',
+        oldStatus: 'in_service',
+        newStatus: 'completed',
+      },
+    });
+    return ticket;
+  }
+
+  // Отменить талон
+  async cancelTicket(id: number) {
+    const ticket = await this.prisma.ticket.update({
+      where: { id },
+      data: { status: 'cancelled' },
+    });
+    await this.prisma.queueEvent.create({
+      data: {
+        ticketId: id,
+        eventType: 'ticket_cancelled',
+        oldStatus: 'waiting',
+        newStatus: 'cancelled',
+      },
+    });
+    return ticket;
+  }
+
+  // Перенаправить талон
+  async redirectTicket(id: number, newRoomId: number) {
+    const ticket = await this.prisma.ticket.update({
+      where: { id },
+      data: { status: 'redirected', roomId: newRoomId },
+    });
+    await this.prisma.queueEvent.create({
+      data: {
+        ticketId: id,
+        eventType: 'patient_redirected',
+        oldStatus: 'waiting',
+        newStatus: 'redirected',
+        payload: { newRoomId },
+      },
+    });
+    return ticket;
   }
 }
