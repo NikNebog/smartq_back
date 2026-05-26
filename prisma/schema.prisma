@@ -1,0 +1,145 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ──────────────────────────────
+// ENUMS
+// ──────────────────────────────
+
+enum Role {
+  admin
+  specialist
+  manager
+}
+
+enum TicketStatus {
+  created
+  waiting
+  called
+  in_service
+  completed
+  cancelled
+  no_show
+  redirected
+}
+
+enum EventType {
+  ticket_created
+  patient_arrived
+  ticket_called
+  service_started
+  service_completed
+  ticket_cancelled
+  patient_redirected
+  queue_overloaded
+}
+
+enum RecommendationSeverity {
+  info
+  warning
+  critical
+}
+
+// ──────────────────────────────
+// MODELS
+// ──────────────────────────────
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(specialist)
+  createdAt DateTime @default(now())
+
+  @@map("users")
+}
+
+model ServiceType {
+  id                      Int      @id @default(autoincrement())
+  name                    String   @unique
+  averageDurationMinutes  Int
+  priorityWeight          Int      @default(1)
+
+  tickets  Ticket[]
+  rooms    RoomServiceType[]
+
+  @@map("service_types")
+}
+
+model Room {
+  id        Int     @id @default(autoincrement())
+  name      String  @unique
+  isActive  Boolean @default(true)
+
+  tickets       Ticket[]
+  serviceTypes  RoomServiceType[]
+
+  @@map("rooms")
+}
+
+// Связующая таблица Room <-> ServiceType
+// (один кабинет может принимать несколько типов услуг)
+model RoomServiceType {
+  roomId        Int
+  serviceTypeId Int
+
+  room         Room        @relation(fields: [roomId], references: [id])
+  serviceType  ServiceType @relation(fields: [serviceTypeId], references: [id])
+
+  @@id([roomId, serviceTypeId])
+  @@map("room_service_types")
+}
+
+model Ticket {
+  id              Int           @id @default(autoincrement())
+  number          String        @unique  // например "A001"
+  priority        Int           @default(1)  // 1-5
+  status          TicketStatus  @default(created)
+  etaMinutes      Int?          // расчётное время ожидания
+
+  serviceTypeId   Int
+  roomId          Int?          // может быть не назначен сразу
+
+  serviceType     ServiceType   @relation(fields: [serviceTypeId], references: [id])
+  room            Room?         @relation(fields: [roomId], references: [id])
+
+  createdAt         DateTime   @default(now())
+  calledAt          DateTime?
+  serviceStartedAt  DateTime?
+  completedAt       DateTime?
+
+  events  QueueEvent[]
+
+  @@map("tickets")
+}
+
+model QueueEvent {
+  id         Int       @id @default(autoincrement())
+  ticketId   Int
+  eventType  EventType
+  oldStatus  TicketStatus?
+  newStatus  TicketStatus?
+  payload    Json?     // любые доп. данные
+
+  ticket     Ticket    @relation(fields: [ticketId], references: [id])
+
+  createdAt  DateTime  @default(now())
+
+  @@map("queue_events")
+}
+
+model QueueRecommendation {
+  id          Int                    @id @default(autoincrement())
+  type        String
+  message     String
+  severity    RecommendationSeverity @default(warning)
+  isResolved  Boolean                @default(false)
+  createdAt   DateTime               @default(now())
+
+  @@map("queue_recommendations")
+}
