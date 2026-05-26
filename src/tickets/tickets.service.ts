@@ -34,14 +34,14 @@ export class TicketsService {
     // Выбираем кабинет (smart routing)
     const room = await this.smartRouting(serviceTypeId);
 
-    // Создаём талон
+    // Создаём талон со статусом created
     const ticket = await this.prisma.ticket.create({
       data: {
         number,
         serviceTypeId,
         roomId: room?.id ?? null,
         priority,
-        status: 'waiting',
+        status: 'created',
         etaMinutes,
       },
       include: { serviceType: true, room: true },
@@ -52,11 +52,28 @@ export class TicketsService {
       data: {
         ticketId: ticket.id,
         eventType: 'ticket_created',
-        newStatus: 'waiting',
+        newStatus: 'created',
         payload: { etaMinutes, roomId: room?.id },
       },
     });
 
+    return ticket;
+  }
+
+  // Пациент прибыл — created → waiting
+  async arriveTicket(id: number) {
+    const ticket = await this.prisma.ticket.update({
+      where: { id },
+      data: { status: 'waiting' },
+    });
+    await this.prisma.queueEvent.create({
+      data: {
+        ticketId: id,
+        eventType: 'patient_arrived',
+        oldStatus: 'created',
+        newStatus: 'waiting',
+      },
+    });
     return ticket;
   }
 
@@ -73,7 +90,6 @@ export class TicketsService {
 
     if (rooms.length === 0) return null;
 
-    // Считаем очередь по каждому кабинету
     let bestRoom = rooms[0];
     let minQueue = Infinity;
 
@@ -115,7 +131,7 @@ export class TicketsService {
     });
   }
 
-  // Вызвать пациента
+  // Вызвать пациента — waiting → called
   async callTicket(id: number) {
     const ticket = await this.prisma.ticket.update({
       where: { id },
@@ -132,7 +148,7 @@ export class TicketsService {
     return ticket;
   }
 
-  // Начать обслуживание
+  // Начать обслуживание — called → in_service
   async startService(id: number) {
     const ticket = await this.prisma.ticket.update({
       where: { id },
@@ -149,7 +165,7 @@ export class TicketsService {
     return ticket;
   }
 
-  // Завершить обслуживание
+  // Завершить обслуживание — in_service → completed
   async completeTicket(id: number) {
     const ticket = await this.prisma.ticket.update({
       where: { id },
@@ -166,7 +182,7 @@ export class TicketsService {
     return ticket;
   }
 
-  // Отменить талон
+  // Отменить талон — any → cancelled
   async cancelTicket(id: number) {
     const ticket = await this.prisma.ticket.update({
       where: { id },
@@ -183,7 +199,24 @@ export class TicketsService {
     return ticket;
   }
 
-  // Перенаправить талон
+  // No-show — called → no_show
+  async noShowTicket(id: number) {
+    const ticket = await this.prisma.ticket.update({
+      where: { id },
+      data: { status: 'no_show' },
+    });
+    await this.prisma.queueEvent.create({
+      data: {
+        ticketId: id,
+        eventType: 'ticket_cancelled',
+        oldStatus: 'called',
+        newStatus: 'no_show',
+      },
+    });
+    return ticket;
+  }
+
+  // Перенаправить талон — any → redirected
   async redirectTicket(id: number, newRoomId: number) {
     const ticket = await this.prisma.ticket.update({
       where: { id },

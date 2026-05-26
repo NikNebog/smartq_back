@@ -13,6 +13,16 @@ export class TicketsController {
     return this.ticketsService.create(body.serviceTypeId, body.priority);
   }
 
+  @Post(':id/arrive')
+  arrive(@Param('id') id: string) {
+    return this.ticketsService.arriveTicket(+id);
+  }
+
+  @Post(':id/no-show')
+  noShow(@Param('id') id: string) {
+    return this.ticketsService.noShowTicket(+id);
+  }
+
   @Get()
   findAll(@Query('status') status?: TicketStatus) {
     return this.ticketsService.findAll(status);
