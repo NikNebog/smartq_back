@@ -57,6 +57,26 @@ export class TicketsService {
       },
     });
 
+    // Если кабинет перегружен — создаём рекомендацию
+    if (room) {
+      const queueCount = await this.prisma.ticket.count({
+        where: {
+          roomId: room.id,
+          status: { in: ['waiting', 'called', 'in_service'] },
+        },
+      });
+
+      if (queueCount > 10) {
+        await this.prisma.queueRecommendation.create({
+          data: {
+            type: 'overload',
+            message: `Кабинет ${room.name} перегружен (${queueCount} человек), рекомендуется перенаправить пациентов`,
+            severity: 'critical',
+          },
+        });
+      }
+    }
+
     return ticket;
   }
 
@@ -111,9 +131,12 @@ export class TicketsService {
   }
 
   // Получить все талоны
-  async findAll(status?: TicketStatus) {
+  async findAll(status?: TicketStatus, roomId?: number) {
     return this.prisma.ticket.findMany({
-      where: status ? { status } : {},
+      where: {
+        ...(status ? { status } : {}),
+        ...(roomId ? { roomId } : {}),
+      },
       include: { serviceType: true, room: true },
       orderBy: { createdAt: 'desc' },
     });
