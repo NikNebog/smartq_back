@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { TicketsService } from './tickets.service';
 import { JwtGuard } from '../auth/guards/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -6,78 +6,91 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { TicketStatus } from '@prisma/client';
 
-@UseGuards(JwtGuard, RolesGuard)
 @Controller('tickets')
 export class TicketsController {
   constructor(private ticketsService: TicketsService) {}
 
-  // Только admin создаёт талоны
-  @Post()
+  // Для автомата — без авторизации
+  @Post('kiosk')
+  createFromKiosk(@Body() body: { serviceTypeId: number; priority?: number }) {
+    return this.ticketsService.create(body.serviceTypeId, body.priority);
+  }
+
+  // Только admin создаёт талоны вручную
+  @UseGuards(JwtGuard, RolesGuard)
   @Roles('admin')
+  @Post()
   create(@Body() body: { serviceTypeId: number; priority?: number }) {
     return this.ticketsService.create(body.serviceTypeId, body.priority);
   }
 
-  @Post(':id/arrive')
+  @UseGuards(JwtGuard, RolesGuard)
   @Roles('admin')
+  @Post(':id/arrive')
   arrive(@Param('id') id: string) {
     return this.ticketsService.arriveTicket(+id);
   }
 
-  @Post(':id/no-show')
+  @UseGuards(JwtGuard, RolesGuard)
   @Roles('admin', 'specialist')
+  @Post(':id/no-show')
   noShow(@Param('id') id: string) {
     return this.ticketsService.noShowTicket(+id);
   }
 
-  // admin видит все талоны, specialist только свои
-  @Get()
+  // admin и manager видят все талоны, specialist только свой кабинет
+  @UseGuards(JwtGuard, RolesGuard)
   @Roles('admin', 'specialist', 'manager')
+  @Get()
   async findAll(
     @Query('status') status: TicketStatus,
     @Query('roomId') roomId: string,
     @CurrentUser() user: any,
   ) {
-    if (user.role === 'specialist' && !roomId) {
-      throw new ForbiddenException('Specialist должен указать roomId');
-    }
     return this.ticketsService.findAll(status, roomId ? +roomId : undefined);
   }
 
-  @Get(':id')
+  @UseGuards(JwtGuard, RolesGuard)
   @Roles('admin', 'specialist', 'manager')
+  @Get(':id')
   findOne(@Param('id') id: string) {
     return this.ticketsService.findOne(+id);
   }
 
-  // Вызвать пациента — только specialist и admin
-  @Post(':id/call')
+  // Вызвать — specialist и admin
+  @UseGuards(JwtGuard, RolesGuard)
   @Roles('admin', 'specialist')
+  @Post(':id/call')
   call(@Param('id') id: string) {
     return this.ticketsService.callTicket(+id);
   }
 
-  @Post(':id/start')
+  @UseGuards(JwtGuard, RolesGuard)
   @Roles('admin', 'specialist')
+  @Post(':id/start')
   start(@Param('id') id: string) {
     return this.ticketsService.startService(+id);
   }
 
-  @Post(':id/complete')
+  @UseGuards(JwtGuard, RolesGuard)
   @Roles('admin', 'specialist')
+  @Post(':id/complete')
   complete(@Param('id') id: string) {
     return this.ticketsService.completeTicket(+id);
   }
 
-  @Post(':id/cancel')
+  // Отменить — только admin
+  @UseGuards(JwtGuard, RolesGuard)
   @Roles('admin')
+  @Post(':id/cancel')
   cancel(@Param('id') id: string) {
     return this.ticketsService.cancelTicket(+id);
   }
 
   // Перенаправить — только admin
-  @Post(':id/redirect')
+  @UseGuards(JwtGuard, RolesGuard)
   @Roles('admin')
+  @Post(':id/redirect')
   redirect(@Param('id') id: string, @Body() body: { newRoomId: number }) {
     return this.ticketsService.redirectTicket(+id, body.newRoomId);
   }

@@ -167,6 +167,18 @@ export class QueueService {
     return overloaded;
   }
 
+  // Данные для табло — без авторизации
+  async getBoardData() {
+    return this.prisma.ticket.findMany({
+      where: {
+        status: { in: ['called', 'in_service'] },
+      },
+      include: { room: true, serviceType: true },
+      orderBy: { calledAt: 'desc' },
+      take: 10,
+    });
+  }
+
   // Получить пациентов с высоким приоритетом которые долго ждут
   async getHighPriorityWaiting() {
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
