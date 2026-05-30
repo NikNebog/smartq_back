@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { QueueService } from './queue.service';
 import { JwtGuard } from '../auth/guards/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -12,6 +12,22 @@ export class QueueController {
   @Get('board')
   getBoardData() {
     return this.queueService.getBoardData();
+  }
+
+  // Аналитика — среднее время по услугам
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles('admin', 'manager')
+  @Get('analytics/service-time')
+  getAvgTimeByServiceType() {
+    return this.queueService.getAvgTimeByServiceType();
+  }
+
+  // Аналитика — за период
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles('admin', 'manager')
+  @Get('analytics/period')
+  getAnalyticsByPeriod(@Query('period') period: string) {
+    return this.queueService.getAnalyticsByPeriod(period);
   }
 
   // Для всех авторизованных
