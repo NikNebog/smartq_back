@@ -31,8 +31,27 @@ export class RoomsService {
   }
 
   async update(id: number, data: any) {
-    return this.prisma.room.update({ where: { id }, data });
+  const { serviceTypeIds, active, ...rest } = data;
+
+  if (active !== undefined) {
+    rest.isActive = active;
   }
+
+  if (serviceTypeIds !== undefined) {
+    await this.prisma.roomServiceType.deleteMany({ where: { roomId: id } });
+    return this.prisma.room.update({
+      where: { id },
+      data: {
+        ...rest,
+        serviceTypes: {
+          create: serviceTypeIds.map((stId: number) => ({ serviceTypeId: stId })),
+        },
+      },
+    });
+  }
+
+  return this.prisma.room.update({ where: { id }, data: rest });
+}
 
   async deactivate(id: number) {
     return this.prisma.room.update({ where: { id }, data: { isActive: false } });
