@@ -3,6 +3,7 @@ import { QueueService } from './queue.service';
 import { JwtGuard } from '../auth/guards/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator'; // ДОБАВИЛИ ИМПОРТ
 
 @Controller('queue')
 export class QueueController {
@@ -38,18 +39,33 @@ export class QueueController {
     return this.queueService.getQueueStats();
   }
 
+  // ИСПРАВЛЕНО: Защита от неопределенного roomId на фронтенде врача
   @UseGuards(JwtGuard, RolesGuard)
   @Roles('admin', 'manager', 'specialist')
   @Get('room/:roomId')
-  getQueueByRoom(@Param('roomId') roomId: string) {
-    return this.queueService.getQueueByRoom(+roomId);
+  getQueueByRoom(@Param('roomId') roomId: string, @CurrentUser() user: any) {
+    let targetRoomId = +roomId;
+    
+    // Если зашел врач, берем ID кабинета прямо из его профиля в БД
+    if (user && user.role === 'specialist' && user.roomId) {
+      targetRoomId = user.roomId;
+    }
+    
+    return this.queueService.getQueueByRoom(targetRoomId);
   }
 
+  // ИСПРАВЛЕНО: Автоматический выбор следующего талона по кабинету врача
   @UseGuards(JwtGuard, RolesGuard)
   @Roles('admin', 'specialist')
   @Get('room/:roomId/next')
-  getNextTicket(@Param('roomId') roomId: string) {
-    return this.queueService.getNextTicket(+roomId);
+  getNextTicket(@Param('roomId') roomId: string, @CurrentUser() user: any) {
+    let targetRoomId = +roomId;
+    
+    if (user && user.role === 'specialist' && user.roomId) {
+      targetRoomId = user.roomId;
+    }
+    
+    return this.queueService.getNextTicket(targetRoomId);
   }
 
   @UseGuards(JwtGuard, RolesGuard)
@@ -60,14 +76,14 @@ export class QueueController {
   }
 
   @UseGuards(JwtGuard, RolesGuard)
-  @Roles('admin', 'manager')
+  @Roles('admin', 'manager', 'specialist')
   @Get('overload')
   checkOverload() {
     return this.queueService.checkOverload();
   }
 
   @UseGuards(JwtGuard, RolesGuard)
-  @Roles('admin', 'manager')
+  @Roles('admin', 'manager', 'specialist')
   @Get('high-priority')
   getHighPriority() {
     return this.queueService.getHighPriorityWaiting();

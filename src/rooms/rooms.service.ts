@@ -22,16 +22,44 @@ export class RoomsService {
     return this.prisma.room.create({
       data: {
         name: data.name,
-        isActive: data.isActive,
+        isActive: data.isActive ?? true,
         serviceTypes: {
-          create: data.serviceTypeIds.map((id) => ({ serviceTypeId: id })),
+          create: (data.serviceTypeIds || []).map((id) => ({ serviceTypeId: Number(id) })),
         },
       },
     });
   }
 
   async update(id: number, data: any) {
-    return this.prisma.room.update({ where: { id }, data });
+    const updateData: any = {};
+
+    // 1. Приведение флагов активности к единому полю базы данных isActive
+    if (data.isActive !== undefined) updateData.isActive = Boolean(data.isActive);
+    if (data.active !== undefined) updateData.isActive = Boolean(data.active);
+
+    // 2. Обновление текстового имени
+    if (data.name !== undefined) updateData.name = data.name;
+
+    // 3. Безопасная перезапись связей услуг (M2M связь через промежуточную таблицу)
+    const rawServices = data.serviceTypeIds || data.services;
+    if (Array.isArray(rawServices)) {
+      // Превращаем любые строки ID в числа
+      const incomingIds = rawServices.map((sid: any) => Number(sid));
+
+      updateData.serviceTypes = {
+        // Удаляем все старые привязки услуг к этому кабинету
+        deleteMany: {},
+        // Создаем новые связи
+        create: incomingIds.map((sid) => ({ serviceTypeId: sid })),
+      };
+    }
+
+    // 4. Выполнение обновления в БД Prisma
+    return this.prisma.room.update({
+      where: { id },
+      data: updateData,
+      include: { serviceTypes: { include: { serviceType: true } } },
+    });
   }
 
   async deactivate(id: number) {

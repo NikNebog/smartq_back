@@ -6,7 +6,7 @@ import { TicketStatus } from '@prisma/client';
 export class TicketsService {
   constructor(private prisma: PrismaService) {}
 
-  // Генерация номера талона A001, A002...
+  // Generation of ticket number A001, A002...
   private async generateTicketNumber(): Promise<string> {
     const count = await this.prisma.ticket.count();
     const number = String(count + 1).padStart(3, '0');
@@ -134,7 +134,10 @@ export class TicketsService {
   async findAll(status?: TicketStatus, roomId?: number) {
     return this.prisma.ticket.findMany({
       where: {
-        ...(status ? { status } : {}),
+        ...(status ? { status } : {
+          // По умолчанию возвращаем только активные талоны
+          status: { in: ['created', 'waiting', 'called', 'in_service'] }
+        }),
         ...(roomId ? { roomId } : {}),
       },
       include: { serviceType: true, room: true },

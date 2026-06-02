@@ -11,7 +11,7 @@ export class AuthService {
   ) {}
 
   // Регистрация
-  async register(name: string, email: string, password: string, role: any) {
+  async register(name: string, email: string, password: string, role: any, roomId?: number) {
     // Проверяем что email не занят
     const exists = await this.prisma.user.findUnique({ where: { email } });
     if (exists) throw new ConflictException('Email уже используется');
@@ -19,9 +19,15 @@ export class AuthService {
     // Хешируем пароль
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Создаём пользователя
+    // Создаём пользователя с привязкой к кабинету
     const user = await this.prisma.user.create({
-      data: { name, email, password: hashedPassword, role },
+      data: { 
+        name, 
+        email, 
+        password: hashedPassword, 
+        role,
+        roomId: roomId ? roomId : null, // Привязываем кабинет, если он передан
+      },
     });
 
     // Возвращаем токен
@@ -40,6 +46,33 @@ export class AuthService {
 
     // Возвращаем токен
     return this.signToken(user.id, user.email, user.role);
+  }
+
+  // Получение всех пользователей
+  async findAllUsers() {
+    return this.prisma.user.findMany({
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        roomId: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  // Обновление пользователя (Новый метод)
+  async updateUser(id: number, data: { name?: string; email?: string; role?: any; roomId?: number }) {
+    return this.prisma.user.update({
+      where: { id },
+      data: {
+        name: data.name,
+        email: data.email,
+        role: data.role,
+        roomId: data.roomId ? Number(data.roomId) : null,
+      },
+    });
   }
 
   // Генерация JWT токена

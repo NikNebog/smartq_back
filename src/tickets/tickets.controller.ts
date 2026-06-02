@@ -16,16 +16,17 @@ export class TicketsController {
     return this.ticketsService.create(body.serviceTypeId, body.priority);
   }
 
-  // Только admin создаёт талоны вручную
+  // Только admin и manager создаёт талоны вручную
   @UseGuards(JwtGuard, RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'manager')
   @Post()
   create(@Body() body: { serviceTypeId: number; priority?: number }) {
-    return this.ticketsService.create(body.serviceTypeId, body.priority);
+    return this.ticketsService.create(+body.serviceTypeId, body.priority);
   }
 
+  // Добавлены роли 'manager' и 'specialist', чтобы убрать ошибку 403 Forbidden
   @UseGuards(JwtGuard, RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'manager', 'specialist')
   @Post(':id/arrive')
   arrive(@Param('id') id: string) {
     return this.ticketsService.arriveTicket(+id);
@@ -38,7 +39,8 @@ export class TicketsController {
     return this.ticketsService.noShowTicket(+id);
   }
 
-  // admin и manager видят все талоны, specialist только свой кабинет
+  // Возвращаем базовый поиск по статусу и roomId без жесткой привязки к сессии user,
+  // чтобы обойти проблему кэширования (304 Not Modified) на фронтенде врача
   @UseGuards(JwtGuard, RolesGuard)
   @Roles('admin', 'specialist', 'manager')
   @Get()
@@ -47,7 +49,8 @@ export class TicketsController {
     @Query('roomId') roomId: string,
     @CurrentUser() user: any,
   ) {
-    return this.ticketsService.findAll(status, roomId ? +roomId : undefined);
+    const finalRoomId = roomId ? +roomId : undefined;
+    return this.ticketsService.findAll(status, finalRoomId);
   }
 
   @UseGuards(JwtGuard, RolesGuard)
