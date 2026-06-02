@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TicketStatus } from '@prisma/client';
 
@@ -14,7 +14,16 @@ export class TicketsService {
   }
 
   // Создать талон
-  async create(serviceTypeId: number, priority: number = 1) {
+  async create(
+    serviceTypeId: number,
+    priority: number = 1,
+    options: {
+      doctorId?: number;
+      etaMinutes?: number;
+      roomId?: number;
+      status?: TicketStatus;
+    } = {},
+  ) {
     const number = await this.generateTicketNumber();
 
     // Считаем ETA
@@ -32,7 +41,9 @@ export class TicketsService {
     const etaMinutes = waitingTickets * (serviceType?.averageDurationMinutes ?? 10);
 
     // Выбираем кабинет (smart routing)
-    const room = await this.smartRouting(serviceTypeId);
+    const room = options.roomId
+      ? await this.prisma.room.findUnique({ where: { id: options.roomId } })
+      : await this.smartRouting(serviceTypeId);
 
     // Создаём талон со статусом created
     const ticket = await this.prisma.ticket.create({
@@ -40,11 +51,12 @@ export class TicketsService {
         number,
         serviceTypeId,
         roomId: room?.id ?? null,
+        doctorId: options.doctorId ?? null,
         priority,
-        status: 'created',
-        etaMinutes,
+        status: options.status ?? 'created',
+        etaMinutes: options.etaMinutes ?? etaMinutes,
       },
-      include: { serviceType: true, room: true },
+      include: { doctor: true, serviceType: true, room: true },
     });
 
     // Сохраняем событие
@@ -85,6 +97,7 @@ export class TicketsService {
     const ticket = await this.prisma.ticket.update({
       where: { id },
       data: { status: 'waiting' },
+      include: { doctor: true, room: true, serviceType: true },
     });
     await this.prisma.queueEvent.create({
       data: {
@@ -137,7 +150,7 @@ export class TicketsService {
         ...(status ? { status } : {}),
         ...(roomId ? { roomId } : {}),
       },
-      include: { serviceType: true, room: true },
+      include: { doctor: true, serviceType: true, room: true },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -147,6 +160,7 @@ export class TicketsService {
     return this.prisma.ticket.findUnique({
       where: { id },
       include: {
+        doctor: true,
         serviceType: true,
         room: true,
         events: { orderBy: { createdAt: 'asc' } },
@@ -159,6 +173,7 @@ export class TicketsService {
     const ticket = await this.prisma.ticket.update({
       where: { id },
       data: { status: 'called', calledAt: new Date() },
+      include: { doctor: true, room: true, serviceType: true },
     });
     await this.prisma.queueEvent.create({
       data: {
@@ -176,6 +191,7 @@ export class TicketsService {
     const ticket = await this.prisma.ticket.update({
       where: { id },
       data: { status: 'in_service', serviceStartedAt: new Date() },
+      include: { doctor: true, room: true, serviceType: true },
     });
     await this.prisma.queueEvent.create({
       data: {
@@ -193,6 +209,7 @@ export class TicketsService {
     const ticket = await this.prisma.ticket.update({
       where: { id },
       data: { status: 'completed', completedAt: new Date() },
+      include: { doctor: true, room: true, serviceType: true },
     });
     await this.prisma.queueEvent.create({
       data: {
@@ -210,6 +227,7 @@ export class TicketsService {
     const ticket = await this.prisma.ticket.update({
       where: { id },
       data: { status: 'cancelled' },
+      include: { doctor: true, room: true, serviceType: true },
     });
     await this.prisma.queueEvent.create({
       data: {
@@ -227,6 +245,7 @@ export class TicketsService {
     const ticket = await this.prisma.ticket.update({
       where: { id },
       data: { status: 'no_show' },
+      include: { doctor: true, room: true, serviceType: true },
     });
     await this.prisma.queueEvent.create({
       data: {
@@ -243,7 +262,8 @@ export class TicketsService {
   async redirectTicket(id: number, newRoomId: number) {
     const ticket = await this.prisma.ticket.update({
       where: { id },
-      data: { status: 'redirected', roomId: newRoomId },
+      data: { status: 'waiting', roomId: newRoomId },
+      include: { doctor: true, room: true, serviceType: true },
     });
     await this.prisma.queueEvent.create({
       data: {
@@ -254,6 +274,60 @@ export class TicketsService {
         payload: { newRoomId },
       },
     });
+    return ticket;
+  }
+
+  async updateTicket(
+    id: number,
+    data: {
+      doctorId?: number;
+      etaMinutes?: number;
+      priority?: number;
+      roomId?: number | null;
+      serviceTypeId?: number;
+      status?: TicketStatus;
+    },
+  ) {
+    const updateData: any = {};
+
+    if (data.serviceTypeId !== undefined) updateData.serviceTypeId = data.serviceTypeId;
+    if (data.roomId !== undefined) updateData.roomId = data.roomId;
+    if (data.doctorId !== undefined) updateData.doctorId = data.doctorId;
+    if (data.priority !== undefined) updateData.priority = data.priority;
+    if (data.etaMinutes !== undefined) updateData.etaMinutes = data.etaMinutes;
+
+    if (data.status) {
+      updateData.status = data.status;
+
+      if (data.status === 'called') updateData.calledAt = new Date();
+      if (data.status === 'in_service') updateData.serviceStartedAt = new Date();
+      if (data.status === 'completed') updateData.completedAt = new Date();
+      if (data.status === 'waiting') {
+        updateData.calledAt = null;
+        updateData.serviceStartedAt = null;
+        updateData.completedAt = null;
+      }
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      throw new BadRequestException('Нет данных для обновления талона');
+    }
+
+    const ticket = await this.prisma.ticket.update({
+      where: { id },
+      data: updateData,
+      include: { doctor: true, room: true, serviceType: true },
+    });
+
+    await this.prisma.queueEvent.create({
+      data: {
+        ticketId: id,
+        eventType: 'patient_redirected',
+        newStatus: ticket.status,
+        payload: updateData,
+      },
+    });
+
     return ticket;
   }
 }

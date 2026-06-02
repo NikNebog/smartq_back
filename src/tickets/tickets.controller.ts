@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { TicketsService } from './tickets.service';
 import { JwtGuard } from '../auth/guards/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -20,8 +20,13 @@ export class TicketsController {
   @UseGuards(JwtGuard, RolesGuard)
   @Roles('admin')
   @Post()
-  create(@Body() body: { serviceTypeId: number; priority?: number }) {
-    return this.ticketsService.create(body.serviceTypeId, body.priority);
+  create(@Body() body: { doctorId?: number; etaMinutes?: number; roomId?: number; serviceTypeId: number; priority?: number; status?: TicketStatus }) {
+    return this.ticketsService.create(body.serviceTypeId, body.priority, {
+      doctorId: body.doctorId,
+      etaMinutes: body.etaMinutes,
+      roomId: body.roomId,
+      status: body.status,
+    });
   }
 
   @UseGuards(JwtGuard, RolesGuard)
@@ -55,6 +60,20 @@ export class TicketsController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.ticketsService.findOne(+id);
+  }
+
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles('admin', 'manager')
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() body: any) {
+    return this.ticketsService.updateTicket(+id, {
+      doctorId: body.doctorId == null ? undefined : Number(body.doctorId),
+      etaMinutes: body.etaMinutes == null ? undefined : Number(body.etaMinutes),
+      priority: body.priority == null ? undefined : Number(body.priority),
+      roomId: body.roomId === undefined ? undefined : body.roomId === null ? null : Number(body.roomId),
+      serviceTypeId: body.serviceTypeId == null ? undefined : Number(body.serviceTypeId),
+      status: body.status,
+    });
   }
 
   // Вызвать — specialist и admin

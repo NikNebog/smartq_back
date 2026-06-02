@@ -12,7 +12,7 @@ export class QueueService {
         roomId,
         status: { in: ['waiting', 'called', 'in_service'] },
       },
-      include: { serviceType: true },
+      include: { doctor: true, room: true, serviceType: true },
       orderBy: [
         { priority: 'desc' },
         { createdAt: 'asc' },
@@ -27,7 +27,7 @@ export class QueueService {
         roomId,
         status: 'waiting',
       },
-      include: { serviceType: true },
+      include: { doctor: true, room: true, serviceType: true },
       orderBy: [
         { priority: 'desc' },
         { createdAt: 'asc' },
@@ -290,7 +290,7 @@ export class QueueService {
         roomName: room.name,
         activeTickets,
         avgServiceMinutes,
-        etaMinutes: activeTickets * avgServiceMinutes,
+        etaMinutes: activeTickets * (avgServiceMinutes || 10),
       });
     }
 
@@ -304,7 +304,7 @@ export class QueueService {
         roomId,
         status: 'waiting',
       },
-      include: { serviceType: true },
+      include: { doctor: true, room: true, serviceType: true },
       orderBy: [
         { priority: 'desc' },
         { createdAt: 'asc' },
@@ -344,11 +344,15 @@ export class QueueService {
   async getBoardData() {
     return this.prisma.ticket.findMany({
       where: {
-        status: { in: ['called', 'in_service'] },
+        status: { in: ['waiting', 'called', 'in_service'] },
       },
-      include: { room: true, serviceType: true },
-      orderBy: { calledAt: 'desc' },
-      take: 10,
+      include: { doctor: true, room: true, serviceType: true },
+      orderBy: [
+        { calledAt: 'desc' },
+        { priority: 'desc' },
+        { createdAt: 'asc' },
+      ],
+      take: 20,
     });
   }
 
@@ -362,7 +366,7 @@ export class QueueService {
         status: 'waiting',
         createdAt: { lte: tenMinutesAgo },
       },
-      include: { serviceType: true, room: true },
+      include: { doctor: true, serviceType: true, room: true },
       orderBy: { createdAt: 'asc' },
     });
   }

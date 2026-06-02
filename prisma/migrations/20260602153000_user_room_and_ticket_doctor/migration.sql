@@ -1,0 +1,8 @@
+ALTER TABLE "users" ADD COLUMN "roomId" INTEGER;
+ALTER TABLE "tickets" ADD COLUMN "doctorId" INTEGER;
+
+ALTER TABLE "users" ADD CONSTRAINT "users_roomId_fkey"
+  FOREIGN KEY ("roomId") REFERENCES "rooms"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+ALTER TABLE "tickets" ADD CONSTRAINT "tickets_doctorId_fkey"
+  FOREIGN KEY ("doctorId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;

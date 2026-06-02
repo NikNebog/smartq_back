@@ -55,7 +55,11 @@ model User {
   email     String   @unique
   password  String
   role      Role     @default(specialist)
+  roomId    Int?
   createdAt DateTime @default(now())
+
+  room             Room?    @relation("RoomStaff", fields: [roomId], references: [id], onDelete: SetNull)
+  assignedTickets  Ticket[] @relation("TicketDoctor")
 
   @@map("users")
 }
@@ -79,6 +83,7 @@ model Room {
 
   tickets       Ticket[]
   serviceTypes  RoomServiceType[]
+  staff         User[] @relation("RoomStaff")
 
   @@map("rooms")
 }
@@ -105,9 +110,11 @@ model Ticket {
 
   serviceTypeId   Int
   roomId          Int?          // может быть не назначен сразу
+  doctorId        Int?          // назначенный специалист
 
   serviceType     ServiceType   @relation(fields: [serviceTypeId], references: [id])
   room            Room?         @relation(fields: [roomId], references: [id])
+  doctor          User?         @relation("TicketDoctor", fields: [doctorId], references: [id], onDelete: SetNull)
 
   createdAt         DateTime   @default(now())
   calledAt          DateTime?
