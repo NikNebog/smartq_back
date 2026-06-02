@@ -55,6 +55,8 @@ model User {
   email     String   @unique
   password  String
   role      Role     @default(specialist)
+  roomId    Int?
+  room      Room?    @relation(fields: [roomId], references: [id])
   createdAt DateTime @default(now())
 
   @@map("users")
@@ -78,6 +80,7 @@ model Room {
   isActive  Boolean @default(true)
 
   tickets       Ticket[]
+  users         User[]
   serviceTypes  RoomServiceType[]
 
   @@map("rooms")
