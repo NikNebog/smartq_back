@@ -7,17 +7,17 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('register')
-  register(@Body() body: { 
-    name: string; 
-    email: string; 
-    password: string; 
+  register(@Body() body: {
+    name: string;
+    email: string;
+    password: string;
     role: any;
     roomId?: number;
   }) {
     return this.authService.register(
-      body.name, 
-      body.email, 
-      body.password, 
+      body.name,
+      body.email,
+      body.password,
       body.role,
       body.roomId ? Number(body.roomId) : undefined
     );
@@ -30,8 +30,8 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  getCurrentUser(@Request() req) {
-    return req.user; 
+  async getCurrentUser(@Request() req) {
+    return this.authService.getMe(req.user.id);
   }
 
   @Get('users')

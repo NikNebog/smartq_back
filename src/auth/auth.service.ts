@@ -12,40 +12,48 @@ export class AuthService {
 
   // Регистрация
   async register(name: string, email: string, password: string, role: any, roomId?: number) {
-    // Проверяем что email не занят
     const exists = await this.prisma.user.findUnique({ where: { email } });
     if (exists) throw new ConflictException('Email уже используется');
 
-    // Хешируем пароль
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Создаём пользователя с привязкой к кабинету
     const user = await this.prisma.user.create({
-      data: { 
-        name, 
-        email, 
-        password: hashedPassword, 
+      data: {
+        name,
+        email,
+        password: hashedPassword,
         role,
-        roomId: roomId ? roomId : null, // Привязываем кабинет, если он передан
+        roomId: roomId ? roomId : null,
       },
     });
 
-    // Возвращаем токен
     return this.signToken(user.id, user.email, user.role);
   }
 
   // Вход
   async login(email: string, password: string) {
-    // Ищем пользователя
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) throw new UnauthorizedException('Неверный email или пароль');
 
-    // Проверяем пароль
     const passwordMatch = await bcrypt.compare(password, user.password);
     if (!passwordMatch) throw new UnauthorizedException('Неверный email или пароль');
 
-    // Возвращаем токен
     return this.signToken(user.id, user.email, user.role);
+  }
+
+  // Текущий пользователь
+  async getMe(userId: number) {
+    return this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        roomId: true,
+        createdAt: true,
+      },
+    });
   }
 
   // Получение всех пользователей
@@ -62,7 +70,7 @@ export class AuthService {
     });
   }
 
-  // Обновление пользователя (Новый метод)
+  // Обновление пользователя
   async updateUser(id: number, data: { name?: string; email?: string; role?: any; roomId?: number }) {
     return this.prisma.user.update({
       where: { id },
