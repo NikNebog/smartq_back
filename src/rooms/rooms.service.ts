@@ -33,28 +33,19 @@ export class RoomsService {
   async update(id: number, data: any) {
     const updateData: any = {};
 
-    // 1. Приведение флагов активности к единому полю базы данных isActive
     if (data.isActive !== undefined) updateData.isActive = Boolean(data.isActive);
     if (data.active !== undefined) updateData.isActive = Boolean(data.active);
-
-    // 2. Обновление текстового имени
     if (data.name !== undefined) updateData.name = data.name;
 
-    // 3. Безопасная перезапись связей услуг (M2M связь через промежуточную таблицу)
     const rawServices = data.serviceTypeIds || data.services;
     if (Array.isArray(rawServices)) {
-      // Превращаем любые строки ID в числа
       const incomingIds = rawServices.map((sid: any) => Number(sid));
-
       updateData.serviceTypes = {
-        // Удаляем все старые привязки услуг к этому кабинету
         deleteMany: {},
-        // Создаем новые связи
         create: incomingIds.map((sid) => ({ serviceTypeId: sid })),
       };
     }
 
-    // 4. Выполнение обновления в БД Prisma
     return this.prisma.room.update({
       where: { id },
       data: updateData,
@@ -63,7 +54,22 @@ export class RoomsService {
   }
 
   async deactivate(id: number) {
-    return this.prisma.room.update({ where: { id }, data: { isActive: false } });
+    const activeTickets = await this.prisma.ticket.count({
+      where: {
+        roomId: id,
+        status: { in: ['waiting', 'called', 'in_service'] },
+      },
+    });
+
+    if (activeTickets > 0) {
+      return this.prisma.room.update({
+        where: { id },
+        data: { isActive: false },
+      });
+    }
+
+    await this.prisma.roomServiceType.deleteMany({ where: { roomId: id } });
+    return this.prisma.room.delete({ where: { id } });
   }
 
   async getQueue(id: number) {

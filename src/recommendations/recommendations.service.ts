@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 
 @Injectable()
 export class RecommendationsService {
@@ -79,5 +79,22 @@ export class RecommendationsService {
         });
       }
     }
+  }
+
+  @Cron('0 0 22 * * *')
+  async resetDailyTickets() {
+    await this.prisma.ticket.updateMany({
+      where: {
+        status: { in: ['waiting', 'called', 'in_service', 'created'] },
+      },
+      data: { status: 'cancelled' },
+    });
+
+    await this.prisma.queueRecommendation.updateMany({
+      where: { isResolved: false },
+      data: { isResolved: true },
+    });
+
+    console.log('Ежедневный сброс талонов выполнен в 22:00');
   }
 }
