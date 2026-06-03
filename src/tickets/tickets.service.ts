@@ -6,7 +6,7 @@ import { TicketStatus } from '@prisma/client';
 export class TicketsService {
   constructor(private prisma: PrismaService) {}
 
-  // Generation of ticket number A001, A002...
+  // Генерация номера талона A001, A002...
   private async generateTicketNumber(): Promise<string> {
     const count = await this.prisma.ticket.count();
     const number = String(count + 1).padStart(3, '0');
@@ -17,7 +17,6 @@ export class TicketsService {
   async create(serviceTypeId: number, priority: number = 1) {
     const number = await this.generateTicketNumber();
 
-    // Считаем ETA
     const waitingTickets = await this.prisma.ticket.count({
       where: {
         serviceTypeId,
@@ -31,10 +30,8 @@ export class TicketsService {
 
     const etaMinutes = waitingTickets * (serviceType?.averageDurationMinutes ?? 10);
 
-    // Выбираем кабинет (smart routing)
     const room = await this.smartRouting(serviceTypeId);
 
-    // Создаём талон со статусом created
     const ticket = await this.prisma.ticket.create({
       data: {
         number,
@@ -47,7 +44,6 @@ export class TicketsService {
       include: { serviceType: true, room: true },
     });
 
-    // Сохраняем событие
     await this.prisma.queueEvent.create({
       data: {
         ticketId: ticket.id,
@@ -57,7 +53,6 @@ export class TicketsService {
       },
     });
 
-    // Если кабинет перегружен — создаём рекомендацию
     if (room) {
       const queueCount = await this.prisma.ticket.count({
         where: {
@@ -78,6 +73,19 @@ export class TicketsService {
     }
 
     return ticket;
+  }
+
+  // Обновить талон
+  async updateTicket(id: number, data: { roomId?: number; priority?: number; serviceTypeId?: number }) {
+    return this.prisma.ticket.update({
+      where: { id },
+      data: {
+        ...(data.roomId ? { roomId: data.roomId } : {}),
+        ...(data.priority ? { priority: data.priority } : {}),
+        ...(data.serviceTypeId ? { serviceTypeId: data.serviceTypeId } : {}),
+      },
+      include: { serviceType: true, room: true },
+    });
   }
 
   // Пациент прибыл — created → waiting
@@ -135,7 +143,6 @@ export class TicketsService {
     return this.prisma.ticket.findMany({
       where: {
         ...(status ? { status } : {
-          // По умолчанию возвращаем только активные талоны
           status: { in: ['created', 'waiting', 'called', 'in_service'] }
         }),
         ...(roomId ? { roomId } : {}),

@@ -9,6 +9,8 @@ import { ServiceTypesModule } from './service-types/service-types.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { RecommendationsModule } from './recommendations/recommendations.module';
 import { RealtimeModule } from './realtime/realtime.module';
+import { UsersController } from './users/users.controller';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -22,6 +24,8 @@ import { RealtimeModule } from './realtime/realtime.module';
     AnalyticsModule,
     RecommendationsModule,
     RealtimeModule,
+    UsersModule,
   ],
+  controllers: [UsersController],
 })
 export class AppModule {}

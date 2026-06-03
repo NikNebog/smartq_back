@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { TicketsService } from './tickets.service';
 import { JwtGuard } from '../auth/guards/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -24,7 +24,17 @@ export class TicketsController {
     return this.ticketsService.create(+body.serviceTypeId, body.priority);
   }
 
-  // Добавлены роли 'manager' и 'specialist', чтобы убрать ошибку 403 Forbidden
+  // Обновить талон
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles('admin', 'manager')
+  @Patch(':id')
+  update(
+    @Param('id') id: string,
+    @Body() body: { roomId?: number; priority?: number; serviceTypeId?: number }
+  ) {
+    return this.ticketsService.updateTicket(+id, body);
+  }
+
   @UseGuards(JwtGuard, RolesGuard)
   @Roles('admin', 'manager', 'specialist')
   @Post(':id/arrive')
@@ -39,8 +49,6 @@ export class TicketsController {
     return this.ticketsService.noShowTicket(+id);
   }
 
-  // Возвращаем базовый поиск по статусу и roomId без жесткой привязки к сессии user,
-  // чтобы обойти проблему кэширования (304 Not Modified) на фронтенде врача
   @UseGuards(JwtGuard, RolesGuard)
   @Roles('admin', 'specialist', 'manager')
   @Get()
@@ -60,7 +68,6 @@ export class TicketsController {
     return this.ticketsService.findOne(+id);
   }
 
-  // Вызвать — specialist и admin
   @UseGuards(JwtGuard, RolesGuard)
   @Roles('admin', 'specialist')
   @Post(':id/call')
@@ -82,17 +89,15 @@ export class TicketsController {
     return this.ticketsService.completeTicket(+id);
   }
 
-  // Отменить — только admin
   @UseGuards(JwtGuard, RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'manager')
   @Post(':id/cancel')
   cancel(@Param('id') id: string) {
     return this.ticketsService.cancelTicket(+id);
   }
 
-  // Перенаправить — только admin
   @UseGuards(JwtGuard, RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'manager')
   @Post(':id/redirect')
   redirect(@Param('id') id: string, @Body() body: { newRoomId: number }) {
     return this.ticketsService.redirectTicket(+id, body.newRoomId);
