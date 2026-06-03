@@ -88,4 +88,10 @@ export class QueueController {
   getHighPriority() {
     return this.queueService.getHighPriorityWaiting();
   }
+
+  @Get('board/:roomId')
+  getBoardByRoom(@Param('roomId') roomId: string) {
+    return this.queueService.getBoardDataByRoom(+roomId);
+  }
+
 }

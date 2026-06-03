@@ -342,14 +342,30 @@ export class QueueService {
 
   // Данные для табло — без авторизации
   async getBoardData() {
-    return this.prisma.ticket.findMany({
-      where: {
-        status: { in: ['called', 'in_service'] },
-      },
-      include: { room: true, serviceType: true },
-      orderBy: { calledAt: 'desc' },
-      take: 10,
-    });
+  // Активные талоны
+  const active = await this.prisma.ticket.findMany({
+    where: {
+      status: { in: ['called', 'in_service'] },
+    },
+    include: { room: true, serviceType: true },
+    orderBy: { calledAt: 'desc' },
+  });
+
+  // Последние завершённые за сегодня
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const recent = await this.prisma.ticket.findMany({
+    where: {
+      status: 'completed',
+      completedAt: { gte: today },
+    },
+    include: { room: true, serviceType: true },
+    orderBy: { completedAt: 'desc' },
+    take: 10,
+  });
+
+  return [...active, ...recent];
   }
 
   // Получить пациентов с высоким приоритетом которые долго ждут
@@ -365,5 +381,34 @@ export class QueueService {
       include: { serviceType: true, room: true },
       orderBy: { createdAt: 'asc' },
     });
+  }
+
+  async getBoardDataByRoom(roomId: number) {
+  // Активные талоны кабинета
+  const active = await this.prisma.ticket.findMany({
+    where: {
+      roomId,
+      status: { in: ['called', 'in_service'] },
+    },
+    include: { room: true, serviceType: true },
+    orderBy: { calledAt: 'desc' },
+  });
+
+  // Последние завершённые за сегодня
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const recent = await this.prisma.ticket.findMany({
+    where: {
+      roomId,
+      status: 'completed',
+      completedAt: { gte: today },
+    },
+    include: { room: true, serviceType: true },
+    orderBy: { completedAt: 'desc' },
+    take: 5,
+  });
+
+  return [...active, ...recent];
   }
 }
