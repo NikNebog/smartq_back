@@ -54,8 +54,23 @@ export class RoomsService {
 }
 
   async deactivate(id: number) {
-    return this.prisma.room.update({ where: { id }, data: { isActive: false } });
+  const activeTickets = await this.prisma.ticket.count({
+    where: {
+      roomId: id,
+      status: { in: ['waiting', 'called', 'in_service'] },
+    },
+  });
+
+  if (activeTickets > 0) {
+    return this.prisma.room.update({
+      where: { id },
+      data: { isActive: false },
+    });
   }
+
+  await this.prisma.roomServiceType.deleteMany({ where: { roomId: id } });
+  return this.prisma.room.delete({ where: { id } });
+}
 
   async getQueue(id: number) {
     return this.prisma.ticket.findMany({
