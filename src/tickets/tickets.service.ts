@@ -30,14 +30,28 @@ export class TicketsService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const count = await this.prisma.ticket.count({
-      where: {
-        serviceTypeId,
-        createdAt: { gte: today },
-      },
-    });
+    let number: string;
+    let attempts = 0;
 
-    return `${prefix}${String(count + 1).padStart(3, '0')}`;
+    do {
+      const count = await this.prisma.ticket.count({
+        where: {
+          serviceTypeId,
+          createdAt: { gte: today },
+        },
+      });
+
+      number = `${prefix}${String(count + 1 + attempts).padStart(3, '0')}`;
+      attempts++;
+
+      const exists = await this.prisma.ticket.findFirst({
+        where: { number },
+      });
+
+      if (!exists) break;
+    } while (attempts < 100);
+
+    return number;
   }
 
   // Создать талон
