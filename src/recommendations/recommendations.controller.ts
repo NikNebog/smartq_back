@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Param } from '@nestjs/common';
+import { Controller, Get, Patch, Post, Param } from '@nestjs/common';
 import { RecommendationsService } from './recommendations.service';
 
 @Controller('recommendations')
@@ -13,5 +13,10 @@ export class RecommendationsController {
   @Patch(':id/resolve')
   resolve(@Param('id') id: string) {
     return this.recommendationsService.resolve(Number(id));
+  }
+
+  @Post('reset-tickets')
+  resetTickets() {
+    return this.recommendationsService.resetDailyTickets();
   }
 }

@@ -20,7 +20,7 @@ export class RecommendationsService {
     });
   }
 
-  @Cron('0 */3 * * * *')
+@Cron('0 0 22 * * *')
   async checkRules() {
     const rooms = await this.prisma.room.findMany({
       include: {
