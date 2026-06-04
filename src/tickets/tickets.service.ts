@@ -6,16 +6,43 @@ import { TicketStatus } from '@prisma/client';
 export class TicketsService {
   constructor(private prisma: PrismaService) {}
 
-  // Генерация номера талона A001, A002...
-  private async generateTicketNumber(): Promise<string> {
-    const count = await this.prisma.ticket.count();
-    const number = String(count + 1).padStart(3, '0');
-    return `A${number}`;
+  // Генерация номера талона с префиксом по типу услуги
+  private async generateTicketNumber(serviceTypeId: number): Promise<string> {
+    const serviceType = await this.prisma.serviceType.findUnique({
+      where: { id: serviceTypeId },
+    });
+
+    const prefixMap: Record<string, string> = {
+      'консультация': 'К',
+      'оплата услуг': 'П',
+      'рентген': 'Р',
+      'лабораторные анализы': 'А',
+      'другое': 'О',
+      'флюорография': 'Ф',
+      'узи': 'У',
+      'мрт': 'М',
+      'экг': 'Э',
+    };
+
+    const name = serviceType?.name?.toLowerCase().trim() ?? '';
+    const prefix = prefixMap[name] ?? name.charAt(0).toUpperCase() ?? 'T';
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const count = await this.prisma.ticket.count({
+      where: {
+        serviceTypeId,
+        createdAt: { gte: today },
+      },
+    });
+
+    return `${prefix}${String(count + 1).padStart(3, '0')}`;
   }
 
   // Создать талон
   async create(serviceTypeId: number, priority: number = 1) {
-    const number = await this.generateTicketNumber();
+    const number = await this.generateTicketNumber(serviceTypeId);
 
     const waitingTickets = await this.prisma.ticket.count({
       where: {
