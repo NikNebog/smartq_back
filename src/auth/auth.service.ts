@@ -71,15 +71,21 @@ export class AuthService {
   }
 
   // Обновление пользователя
-  async updateUser(id: number, data: { name?: string; email?: string; role?: any; roomId?: number }) {
+  async updateUser(id: number, data: { name?: string; email?: string; password?: string; role?: any; roomId?: number }) {
+    const updateData: any = {
+      name: data.name,
+      email: data.email,
+      role: data.role,
+      roomId: data.roomId ? Number(data.roomId) : null,
+    };
+
+    if (data.password) {
+      updateData.password = await bcrypt.hash(data.password, 10);
+    }
+
     return this.prisma.user.update({
       where: { id },
-      data: {
-        name: data.name,
-        email: data.email,
-        role: data.role,
-        roomId: data.roomId ? Number(data.roomId) : null,
-      },
+      data: updateData,
     });
   }
 

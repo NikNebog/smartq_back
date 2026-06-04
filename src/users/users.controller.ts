@@ -3,6 +3,7 @@ import { JwtGuard } from '../auth/guards/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { PrismaService } from '../prisma/prisma.service';
+import * as bcrypt from 'bcrypt';
 
 @Controller('users')
 export class UsersController {
@@ -26,18 +27,24 @@ export class UsersController {
   @UseGuards(JwtGuard, RolesGuard)
   @Roles('admin', 'manager')
   @Patch(':id')
-  update(
+  async update(
     @Param('id') id: string,
-    @Body() body: { name?: string; email?: string; role?: any; roomId?: number }
+    @Body() body: { name?: string; email?: string; password?: string; role?: any; roomId?: number }
   ) {
+    const updateData: any = {
+      ...(body.name ? { name: body.name } : {}),
+      ...(body.email ? { email: body.email } : {}),
+      ...(body.role ? { role: body.role } : {}),
+      ...(body.roomId !== undefined ? { roomId: body.roomId ? +body.roomId : null } : {}),
+    };
+
+    if (body.password) {
+      updateData.password = await bcrypt.hash(body.password, 10);
+    }
+
     return this.prisma.user.update({
       where: { id: +id },
-      data: {
-        ...(body.name ? { name: body.name } : {}),
-        ...(body.email ? { email: body.email } : {}),
-        ...(body.role ? { role: body.role } : {}),
-        ...(body.roomId !== undefined ? { roomId: body.roomId ? +body.roomId : null } : {}),
-      },
+      data: updateData,
       select: {
         id: true,
         name: true,

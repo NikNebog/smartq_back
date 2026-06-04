@@ -65,7 +65,7 @@ export class TicketsService {
         serviceTypeId,
         roomId: room?.id ?? null,
         priority,
-        status: 'created',
+        status: 'waiting',
         etaMinutes,
       },
       include: { serviceType: true, room: true },
@@ -75,7 +75,7 @@ export class TicketsService {
       data: {
         ticketId: ticket.id,
         eventType: 'ticket_created',
-        newStatus: 'created',
+        newStatus: 'waiting',
         payload: { etaMinutes, roomId: room?.id },
       },
     });
@@ -170,7 +170,7 @@ export class TicketsService {
     return this.prisma.ticket.findMany({
       where: {
         ...(status ? { status } : {
-          status: { in: ['created', 'waiting', 'called', 'in_service'] }
+          status: { in: ['waiting', 'called', 'in_service'] }
         }),
         ...(roomId ? { roomId } : {}),
       },

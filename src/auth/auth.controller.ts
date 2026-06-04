@@ -42,7 +42,7 @@ export class AuthController {
   @Patch('users/:id')
   update(
     @Param('id') id: string,
-    @Body() body: { name?: string; email?: string; role?: any; roomId?: number }
+    @Body() body: { name?: string; email?: string; password?: string; role?: any; roomId?: number }
   ) {
     return this.authService.updateUser(Number(id), body);
   }
