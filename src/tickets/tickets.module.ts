@@ -1,8 +1,11 @@
 import { Module } from '@nestjs/common';
 import { TicketsService } from './tickets.service';
 import { TicketsController } from './tickets.controller';
+import { RealtimeModule } from '../realtime/realtime.module';
+import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
+  imports: [RealtimeModule, PrismaModule],
   controllers: [TicketsController],
   providers: [TicketsService],
   exports: [TicketsService],

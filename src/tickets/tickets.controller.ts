@@ -10,13 +10,11 @@ import { TicketStatus } from '@prisma/client';
 export class TicketsController {
   constructor(private ticketsService: TicketsService) {}
 
-  // Для автомата — без авторизации
   @Post('kiosk')
   createFromKiosk(@Body() body: { serviceTypeId: number; priority?: number }) {
     return this.ticketsService.create(body.serviceTypeId, body.priority);
   }
 
-  // Только admin и manager создаёт талоны вручную
   @UseGuards(JwtGuard, RolesGuard)
   @Roles('admin', 'manager')
   @Post()
@@ -24,9 +22,8 @@ export class TicketsController {
     return this.ticketsService.create(+body.serviceTypeId, body.priority);
   }
 
-  // Обновить талон
   @UseGuards(JwtGuard, RolesGuard)
-  @Roles('admin', 'manager')
+  @Roles('admin', 'manager', 'specialist')
   @Patch(':id')
   update(
     @Param('id') id: string,
@@ -90,14 +87,14 @@ export class TicketsController {
   }
 
   @UseGuards(JwtGuard, RolesGuard)
-  @Roles('admin', 'manager')
+  @Roles('admin', 'manager', 'specialist')
   @Post(':id/cancel')
   cancel(@Param('id') id: string) {
     return this.ticketsService.cancelTicket(+id);
   }
 
   @UseGuards(JwtGuard, RolesGuard)
-  @Roles('admin', 'manager')
+  @Roles('admin', 'manager', 'specialist')
   @Post(':id/redirect')
   redirect(@Param('id') id: string, @Body() body: { newRoomId: number }) {
     return this.ticketsService.redirectTicket(+id, body.newRoomId);
