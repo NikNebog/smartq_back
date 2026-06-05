@@ -7,9 +7,9 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.enableCors({
-    origin: 'http://localhost:5173',
-    credentials: true,
-  });
+  origin: ['http://localhost:5173', 'http://192.168.11.52:5173', 'http://10.103.220.161:5174'],
+  credentials: true,
+});
 
   const config = new DocumentBuilder()
     .setTitle('SmartQ API')

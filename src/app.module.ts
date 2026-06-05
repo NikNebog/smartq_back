@@ -11,6 +11,7 @@ import { RecommendationsModule } from './recommendations/recommendations.module'
 import { RealtimeModule } from './realtime/realtime.module';
 import { UsersController } from './users/users.controller';
 import { UsersModule } from './users/users.module';
+import { BoardScreensModule } from './board-screens/board-screens.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { UsersModule } from './users/users.module';
     RecommendationsModule,
     RealtimeModule,
     UsersModule,
+    BoardScreensModule,
   ],
   controllers: [UsersController],
 })

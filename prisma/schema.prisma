@@ -146,4 +146,14 @@ model QueueRecommendation {
   createdAt   DateTime               @default(now())
 
   @@map("queue_recommendations")
+
+}
+
+model BoardScreen {
+  id        Int      @id @default(autoincrement())
+  name      String
+  roomNames String[]
+  createdAt DateTime @default(now())
+
+  @@map("board_screens")
 }
