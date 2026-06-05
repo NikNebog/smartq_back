@@ -181,17 +181,15 @@ export class TicketsService {
 
   // Получить все талоны
   async findAll(status?: TicketStatus, roomId?: number) {
-    return this.prisma.ticket.findMany({
-      where: {
-        ...(status ? { status } : {
-          status: { in: ['waiting', 'called', 'in_service'] }
-        }),
-        ...(roomId ? { roomId } : {}),
-      },
-      include: { serviceType: true, room: true },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
+  return this.prisma.ticket.findMany({
+    where: {
+      ...(status ? { status } : {}),
+      ...(roomId ? { roomId } : {}),
+    },
+    include: { serviceType: true, room: true },
+    orderBy: { createdAt: 'desc' },
+  });
+}
 
   // Получить один талон
   async findOne(id: number) {
