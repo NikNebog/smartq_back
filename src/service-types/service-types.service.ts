@@ -13,12 +13,25 @@ export class ServiceTypesService {
     return this.prisma.serviceType.findUnique({ where: { id } });
   }
 
-  async create(data: { name: string; averageDurationMinutes: number; priorityWeight: number }) {
-    return this.prisma.serviceType.create({ data });
+  async create(data: any) {
+    return this.prisma.serviceType.create({
+      data: {
+        name: data.name,
+        averageDurationMinutes: data.averageDurationMinutes ?? 10,
+        priorityWeight: data.priorityWeight ?? 1,
+      },
+    });
   }
 
   async update(id: number, data: any) {
-    return this.prisma.serviceType.update({ where: { id }, data });
+    return this.prisma.serviceType.update({
+      where: { id },
+      data: {
+        ...(data.name ? { name: data.name } : {}),
+        ...(data.averageDurationMinutes ? { averageDurationMinutes: data.averageDurationMinutes } : {}),
+        ...(data.priorityWeight ? { priorityWeight: data.priorityWeight } : {}),
+      },
+    });
   }
 
   async remove(id: number) {
