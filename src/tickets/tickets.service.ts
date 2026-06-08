@@ -241,6 +241,19 @@ export class TicketsService {
     return ticket;
   }
 
+async returnTicket(id: number) {
+  const ticket = await this.prisma.ticket.update({
+    where: { id },
+    data: { status: 'waiting' },
+    include: { room: true },
+  });
+  await this.prisma.queueEvent.create({
+    data: { ticketId: id, eventType: 'patient_arrived', oldStatus: 'no_show', newStatus: 'waiting' },
+  });
+  this.realtime.sendStatusUpdate(ticket.number, 'waiting', ticket.room?.name ?? '');
+  return ticket;
+}
+
   async redirectTicket(id: number, newRoomId: number) {
     const ticket = await this.prisma.ticket.update({
       where: { id },

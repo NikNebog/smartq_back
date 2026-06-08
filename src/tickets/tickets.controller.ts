@@ -46,6 +46,13 @@ export class TicketsController {
     return this.ticketsService.noShowTicket(+id);
   }
 
+@UseGuards(JwtGuard, RolesGuard)
+  @Roles('admin', 'specialist')
+  @Post(':id/return')
+  returnTicket(@Param('id') id: string) {
+    return this.ticketsService.returnTicket(+id);
+  }
+
   @UseGuards(JwtGuard, RolesGuard)
   @Roles('admin', 'specialist', 'manager')
   @Get()
