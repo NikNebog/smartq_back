@@ -12,6 +12,7 @@ import { RealtimeModule } from './realtime/realtime.module';
 import { UsersController } from './users/users.controller';
 import { UsersModule } from './users/users.module';
 import { BoardScreensModule } from './board-screens/board-screens.module';
+import { TerminalsModule } from './terminals/terminals.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { BoardScreensModule } from './board-screens/board-screens.module';
     RealtimeModule,
     UsersModule,
     BoardScreensModule,
+    TerminalsModule,
   ],
   controllers: [UsersController],
 })

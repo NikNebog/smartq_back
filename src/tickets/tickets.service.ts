@@ -52,7 +52,7 @@ export class TicketsService {
     return number;
   }
 
-  async create(serviceTypeId: number, priority: number = 1) {
+  async create(serviceTypeId: number, priority: number = 1, roomId?: number, language?: string) {
     const number = await this.generateTicketNumber(serviceTypeId);
 
     const waitingTickets = await this.prisma.ticket.count({
@@ -64,7 +64,7 @@ export class TicketsService {
     });
 
     const etaMinutes = waitingTickets * (serviceType?.averageDurationMinutes ?? 10);
-    const room = await this.smartRouting(serviceTypeId);
+    const room = await this.resolveCreateRoom(serviceTypeId, roomId);
 
     const ticket = await this.prisma.ticket.create({
       data: {
@@ -72,6 +72,7 @@ export class TicketsService {
         serviceTypeId,
         roomId: room?.id ?? null,
         priority,
+        language: language || null,
         status: 'waiting',
         etaMinutes,
       },
@@ -106,6 +107,24 @@ export class TicketsService {
     }
 
     return ticket;
+  }
+
+  private async resolveCreateRoom(serviceTypeId: number, roomId?: number) {
+    if (Number.isFinite(roomId)) {
+      const requestedRoom = await this.prisma.room.findFirst({
+        where: {
+          id: roomId,
+          isActive: true,
+          serviceTypes: { some: { serviceTypeId } },
+        },
+      });
+
+      if (requestedRoom) {
+        return requestedRoom;
+      }
+    }
+
+    return this.smartRouting(serviceTypeId);
   }
 
   async updateTicket(id: number, data: { roomId?: number; priority?: number; serviceTypeId?: number }) {

@@ -14,16 +14,97 @@ async function main() {
   for (const st of serviceTypes) {
     await prisma.serviceType.upsert({
       where: { name: st.name },
-      update: {},
-      create: st,
+      update: { active: true },
+      create: { ...st, active: true },
     });
   }
 
-await prisma.appSettings.upsert({
-  where: { id: 1 },
-  update: {},
-  create: { appName: 'SmartQ' },
-});
+  const savedServiceTypes = await prisma.serviceType.findMany({
+    where: { name: { in: serviceTypes.map((serviceType) => serviceType.name) } },
+  });
+  const serviceTypeByName = new Map(savedServiceTypes.map((serviceType) => [serviceType.name, serviceType]));
+
+  const rooms = [
+    {
+      name: 'Кабинет 1',
+      serviceNames: ['consultation', 'payment', 'other'],
+    },
+    {
+      name: 'Кабинет 2',
+      serviceNames: ['xray', 'analysis'],
+    },
+  ];
+
+  for (const roomSeed of rooms) {
+    const room = await prisma.room.upsert({
+      where: { name: roomSeed.name },
+      update: {
+        isActive: true,
+        placeType: 'CABINET',
+        workingStartTime: '08:00',
+        workingEndTime: '18:00',
+      },
+      create: {
+        name: roomSeed.name,
+        isActive: true,
+        placeType: 'CABINET',
+        workingStartTime: '08:00',
+        workingEndTime: '18:00',
+      },
+    });
+
+    for (const serviceName of roomSeed.serviceNames) {
+      const serviceType = serviceTypeByName.get(serviceName);
+
+      if (!serviceType) {
+        continue;
+      }
+
+      await prisma.roomServiceType.upsert({
+        where: {
+          roomId_serviceTypeId: {
+            roomId: room.id,
+            serviceTypeId: serviceType.id,
+          },
+        },
+        update: {},
+        create: {
+          roomId: room.id,
+          serviceTypeId: serviceType.id,
+        },
+      });
+    }
+  }
+
+  const seededRooms = await prisma.room.findMany({
+    where: { name: { in: rooms.map((room) => room.name) } },
+  });
+
+  await prisma.$executeRaw`
+    INSERT INTO "terminals" ("id", "active", "location", "name", "roomIds", "serviceTypeIds", "updatedAt")
+    VALUES (
+      1,
+      true,
+      'Главный вход',
+      'Киоск регистрации',
+      ${seededRooms.map((room) => room.id)},
+      ${savedServiceTypes.map((serviceType) => serviceType.id)},
+      NOW()
+    )
+    ON CONFLICT ("id") DO UPDATE SET
+      "active" = EXCLUDED."active",
+      "location" = EXCLUDED."location",
+      "name" = EXCLUDED."name",
+      "roomIds" = EXCLUDED."roomIds",
+      "serviceTypeIds" = EXCLUDED."serviceTypeIds",
+      "updatedAt" = NOW()
+  `;
+
+  await prisma.appSettings.upsert({
+    where: { id: 1 },
+    update: {},
+    create: { appName: 'SmartQ' },
+  });
 
   console.log('Seed данные добавлены!');
 }

@@ -11,15 +11,27 @@ export class TicketsController {
   constructor(private ticketsService: TicketsService) {}
 
   @Post('kiosk')
-  createFromKiosk(@Body() body: { serviceTypeId: number; priority?: number }) {
-    return this.ticketsService.create(body.serviceTypeId, body.priority);
+  createFromKiosk(
+    @Body() body: { serviceTypeId: number | string; priority?: number; roomId?: number | string; language?: string },
+  ) {
+    return this.ticketsService.create(
+      +body.serviceTypeId,
+      body.priority,
+      body.roomId !== undefined ? +body.roomId : undefined,
+      body.language,
+    );
   }
 
   @UseGuards(JwtGuard, RolesGuard)
   @Roles('admin', 'manager')
   @Post()
-  create(@Body() body: { serviceTypeId: number; priority?: number }) {
-    return this.ticketsService.create(+body.serviceTypeId, body.priority);
+  create(@Body() body: { serviceTypeId: number | string; priority?: number; roomId?: number | string; language?: string }) {
+    return this.ticketsService.create(
+      +body.serviceTypeId,
+      body.priority,
+      body.roomId !== undefined ? +body.roomId : undefined,
+      body.language,
+    );
   }
 
   @UseGuards(JwtGuard, RolesGuard)
