@@ -45,6 +45,12 @@ enum RecommendationSeverity {
   critical
 }
 
+enum PlaceType {
+  CABINET
+  WINDOW
+  TABLE
+}
+
 // ──────────────────────────────
 // MODELS
 // ──────────────────────────────
@@ -67,6 +73,7 @@ model ServiceType {
   name                    String   @unique
   averageDurationMinutes  Int
   priorityWeight          Int      @default(1)
+  active                  Boolean  @default(true)
 
   tickets  Ticket[]
   rooms    RoomServiceType[]
@@ -75,9 +82,12 @@ model ServiceType {
 }
 
 model Room {
-  id        Int     @id @default(autoincrement())
-  name      String  @unique
-  isActive  Boolean @default(true)
+  id               Int       @id @default(autoincrement())
+  name             String    @unique
+  isActive         Boolean   @default(true)
+  placeType        PlaceType @default(CABINET)
+  workingStartTime String?   // формат "HH:MM"
+  workingEndTime   String?   // формат "HH:MM"
 
   tickets       Ticket[]
   users         User[]
@@ -87,7 +97,6 @@ model Room {
 }
 
 // Связующая таблица Room <-> ServiceType
-// (один кабинет может принимать несколько типов услуг)
 model RoomServiceType {
   roomId        Int
   serviceTypeId Int
@@ -103,11 +112,13 @@ model Ticket {
   id              Int           @id @default(autoincrement())
   number          String        @unique  // например "A001"
   priority        Int           @default(1)  // 1-5
+  isCritical      Boolean       @default(false)
+  language        String?       // например "ru", "kk", "en"
   status          TicketStatus  @default(created)
   etaMinutes      Int?          // расчётное время ожидания
 
   serviceTypeId   Int
-  roomId          Int?          // может быть не назначен сразу
+  roomId          Int?
 
   serviceType     ServiceType   @relation(fields: [serviceTypeId], references: [id])
   room            Room?         @relation(fields: [roomId], references: [id])
@@ -128,7 +139,7 @@ model QueueEvent {
   eventType  EventType
   oldStatus  TicketStatus?
   newStatus  TicketStatus?
-  payload    Json?     // любые доп. данные
+  payload    Json?
 
   ticket     Ticket    @relation(fields: [ticketId], references: [id])
 
@@ -146,7 +157,6 @@ model QueueRecommendation {
   createdAt   DateTime               @default(now())
 
   @@map("queue_recommendations")
-
 }
 
 model BoardScreen {
@@ -156,4 +166,14 @@ model BoardScreen {
   createdAt DateTime @default(now())
 
   @@map("board_screens")
+}
+
+// Сюда будут сохраняться название приложения и иконка от админа
+model AppSettings {
+  id        Int      @id @default(1)
+  appName   String   @default("SmartQ")
+  appIcon   String   @default("default_icon.png")
+  updatedAt DateTime @updatedAt
+
+  @@map("app_settings")
 }

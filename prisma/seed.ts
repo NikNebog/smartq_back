@@ -19,6 +19,12 @@ async function main() {
     });
   }
 
+await prisma.appSettings.upsert({
+  where: { id: 1 },
+  update: {},
+  create: { appName: 'SmartQ' },
+});
+
   console.log('Seed данные добавлены!');
 }
 
