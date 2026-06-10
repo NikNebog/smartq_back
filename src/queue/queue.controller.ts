@@ -15,6 +15,12 @@ export class QueueController {
     return this.queueService.getBoardData();
   }
 
+  // История вызовов для табло — без авторизации, только безопасные поля
+  @Get('board-history')
+  getBoardHistory() {
+    return this.queueService.getBoardHistory();
+  }
+
   // Аналитика — среднее время по услугам
   @UseGuards(JwtGuard, RolesGuard)
   @Roles('admin', 'manager')

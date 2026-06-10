@@ -369,6 +369,61 @@ export class QueueService {
     return [...active, ...recent];
   }
 
+  // История вызванных талонов для табло — без авторизации
+  async getBoardHistory() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return this.prisma.ticket.findMany({
+      where: {
+        OR: [
+          { status: { in: ['called', 'in_service'] } },
+          { calledAt: { not: null } },
+          { status: 'completed', completedAt: { gte: today } },
+        ],
+      },
+      select: {
+        id: true,
+        number: true,
+        priority: true,
+        language: true,
+        status: true,
+        etaMinutes: true,
+        serviceTypeId: true,
+        roomId: true,
+        createdAt: true,
+        calledAt: true,
+        serviceStartedAt: true,
+        completedAt: true,
+        serviceType: {
+          select: {
+            id: true,
+            name: true,
+            averageDurationMinutes: true,
+            priorityWeight: true,
+            active: true,
+          },
+        },
+        room: {
+          select: {
+            id: true,
+            name: true,
+            isActive: true,
+            placeType: true,
+            workingStartTime: true,
+            workingEndTime: true,
+          },
+        },
+      },
+      orderBy: [
+        { calledAt: 'desc' },
+        { completedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      take: 30,
+    });
+  }
+
   // Получить пациентов с высоким приоритетом которые долго ждут
   async getHighPriorityWaiting() {
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
