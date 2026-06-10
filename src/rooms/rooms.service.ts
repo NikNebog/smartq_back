@@ -1,6 +1,6 @@
 import { Injectable, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { PlaceType } from '@prisma/client';
+import { PlaceType, Prisma } from '@prisma/client';
 
 const normalizePlaceType = (value?: string): PlaceType => {
   if (!value) return PlaceType.CABINET;
@@ -33,23 +33,63 @@ const normalizePlaceType = (value?: string): PlaceType => {
 export class RoomsService {
   constructor(private prisma: PrismaService) {}
 
+  private async getTicketIssueEnabledByRoomIds(ids: number[]) {
+    if (ids.length === 0) {
+      return new Map<number, boolean>();
+    }
+
+    const rows = await this.prisma.$queryRaw<Array<{ id: number; ticketIssueEnabled: boolean }>>`
+      SELECT "id", "ticketIssueEnabled"
+      FROM "rooms"
+      WHERE "id" IN (${Prisma.join(ids)})
+    `;
+
+    return new Map(rows.map((row) => [row.id, row.ticketIssueEnabled]));
+  }
+
+  private async withTicketIssueEnabled<T extends { id: number }>(room: T): Promise<T & { ticketIssueEnabled: boolean }> {
+    const issueMap = await this.getTicketIssueEnabledByRoomIds([room.id]);
+
+    return {
+      ...room,
+      ticketIssueEnabled: issueMap.get(room.id) ?? true,
+    };
+  }
+
+  private async updateTicketIssueEnabled(id: number, enabled: boolean) {
+    await this.prisma.$executeRaw`
+      UPDATE "rooms"
+      SET "ticketIssueEnabled" = ${enabled}
+      WHERE "id" = ${id}
+    `;
+  }
+
   async findAll() {
-    return this.prisma.room.findMany({
+    const rooms = await this.prisma.room.findMany({
       include: { serviceTypes: { include: { serviceType: true } } },
     });
+    const issueMap = await this.getTicketIssueEnabledByRoomIds(rooms.map((room) => room.id));
+
+    return rooms.map((room) => ({
+      ...room,
+      ticketIssueEnabled: issueMap.get(room.id) ?? true,
+    }));
   }
 
   async findOne(id: number) {
-    return this.prisma.room.findUnique({
+    const room = await this.prisma.room.findUnique({
       where: { id },
       include: { serviceTypes: { include: { serviceType: true } } },
     });
+
+    return room ? this.withTicketIssueEnabled(room) : null;
   }
 
  async create(data: {
   name: string | null;
   serviceTypeIds: number[];
   isActive?: boolean;
+  ticketIssueEnabled?: boolean;
   placeType?: string;
   workingStartTime?: string;
   workingEndTime?: string;
@@ -90,9 +130,11 @@ export class RoomsService {
     },
   });
 
+  await this.updateTicketIssueEnabled(result.id, data.ticketIssueEnabled ?? true);
+
   console.log('=== CREATE RESULT ===', JSON.stringify(result, null, 2));
 
-  return result;
+  return this.withTicketIssueEnabled(result);
 }
 
     async update(id: number, data: any) {
@@ -100,6 +142,7 @@ export class RoomsService {
 
     if (data.isActive !== undefined) updateData.isActive = Boolean(data.isActive);
     if (data.active !== undefined) updateData.isActive = Boolean(data.active);
+    const ticketIssueEnabled = data.ticketIssueEnabled ?? data.isTicketIssueEnabled ?? data.kioskEnabled;
 
     const nameRaw = data.name ?? data.title ?? data.roomName;
     if (nameRaw !== undefined) {
@@ -136,10 +179,14 @@ export class RoomsService {
       include: { serviceTypes: { include: { serviceType: true } } },
     });
 
+    if (ticketIssueEnabled !== undefined) {
+      await this.updateTicketIssueEnabled(id, Boolean(ticketIssueEnabled));
+    }
+
     // Этот лог покажет в консоли, под какими именами данные выходят из базы
     console.log('=== LOG: UPDATE RESULT ===', JSON.stringify(result, null, 2));
 
-    return result;
+    return this.withTicketIssueEnabled(result);
     // --------------------------------------------
   }
 

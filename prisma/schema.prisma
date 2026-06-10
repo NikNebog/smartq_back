@@ -85,6 +85,7 @@ model Room {
   id               Int       @id @default(autoincrement())
   name             String    @unique
   isActive         Boolean   @default(true)
+  ticketIssueEnabled Boolean @default(true)
   placeType        PlaceType @default(CABINET)
   workingStartTime String?   // формат "HH:MM"
   workingEndTime   String?   // формат "HH:MM"

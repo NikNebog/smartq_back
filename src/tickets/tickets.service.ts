@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TicketStatus } from '@prisma/client';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -65,6 +65,14 @@ export class TicketsService {
 
     const etaMinutes = waitingTickets * (serviceType?.averageDurationMinutes ?? 10);
     const room = await this.resolveCreateRoom(serviceTypeId, roomId);
+    const peopleAhead = room
+      ? await this.prisma.ticket.count({
+          where: {
+            roomId: room.id,
+            status: { in: ['waiting', 'called', 'in_service', 'redirected'] },
+          },
+        })
+      : 0;
 
     const ticket = await this.prisma.ticket.create({
       data: {
@@ -106,22 +114,35 @@ export class TicketsService {
       }
     }
 
-    return ticket;
+    return {
+      ...ticket,
+      peopleAhead,
+      queuePosition: peopleAhead + 1,
+    };
   }
 
   private async resolveCreateRoom(serviceTypeId: number, roomId?: number) {
     if (Number.isFinite(roomId)) {
-      const requestedRoom = await this.prisma.room.findFirst({
-        where: {
-          id: roomId,
-          isActive: true,
-          serviceTypes: { some: { serviceTypeId } },
-        },
-      });
+      const [requestedRoom] = await this.prisma.$queryRaw<Array<{ id: number; name: string }>>`
+        SELECT r."id", r."name"
+        FROM "rooms" r
+        WHERE r."id" = ${roomId}
+          AND r."isActive" = true
+          AND COALESCE(r."ticketIssueEnabled", true) = true
+          AND EXISTS (
+            SELECT 1
+            FROM "room_service_types" rst
+            WHERE rst."roomId" = r."id"
+              AND rst."serviceTypeId" = ${serviceTypeId}
+          )
+        LIMIT 1
+      `;
 
       if (requestedRoom) {
         return requestedRoom;
       }
+
+      throw new BadRequestException('Выдача талонов в это место обслуживания закрыта или услуга недоступна.');
     }
 
     return this.smartRouting(serviceTypeId);
@@ -153,9 +174,18 @@ export class TicketsService {
   }
 
   private async smartRouting(serviceTypeId: number) {
-    const rooms = await this.prisma.room.findMany({
-      where: { isActive: true, serviceTypes: { some: { serviceTypeId } } },
-    });
+    const rooms = await this.prisma.$queryRaw<Array<{ id: number; name: string }>>`
+      SELECT r."id", r."name"
+      FROM "rooms" r
+      WHERE r."isActive" = true
+        AND COALESCE(r."ticketIssueEnabled", true) = true
+        AND EXISTS (
+          SELECT 1
+          FROM "room_service_types" rst
+          WHERE rst."roomId" = r."id"
+            AND rst."serviceTypeId" = ${serviceTypeId}
+        )
+    `;
 
     if (rooms.length === 0) return null;
 

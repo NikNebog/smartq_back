@@ -15,6 +15,9 @@ function normalizeRoomResponse(room: any) {
     // Фронт читает workStartTime / workEndTime (без "ing")
     workStartTime: room.workingStartTime ?? null,
     workEndTime: room.workingEndTime ?? null,
+    ticketIssueEnabled: room.ticketIssueEnabled ?? true,
+    isTicketIssueEnabled: room.ticketIssueEnabled ?? true,
+    kioskEnabled: room.ticketIssueEnabled ?? true,
     // Нормализуем placeType под ожидания фронта
     placeType: placeTypeToFrontend[room.placeType] ?? 'cabinet',
     // Нормализуем вложенные serviceTypes
@@ -55,6 +58,7 @@ export class RoomsController {
       name,
       serviceTypeIds: body.serviceTypeIds || body.services || [],
       isActive: body.isActive ?? body.active ?? true,
+      ticketIssueEnabled: body.ticketIssueEnabled ?? body.isTicketIssueEnabled ?? body.kioskEnabled ?? true,
       placeType: body.placeType,
       workingStartTime: body.workingStartTime ?? body.workStartTime,
       workingEndTime: body.workingEndTime ?? body.workEndTime,
