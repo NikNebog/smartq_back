@@ -106,6 +106,38 @@ async function main() {
     create: { appName: 'SmartQ' },
   });
 
+  await prisma.$executeRaw`
+    INSERT INTO "board_settings" ("id", "settings", "updatedAt")
+    VALUES (
+      1,
+      ${JSON.stringify({
+        boardType: 'general',
+        profiles: [
+          {
+            boardType: 'general',
+            id: 'general',
+            name: 'Общее табло',
+            recentCallsLimit: 10,
+            roomBoardId: '',
+            showRecentCalls: true,
+            showTime: true,
+            template: 'classic',
+            voiceEnabled: true,
+          },
+        ],
+        recentCallsLimit: 10,
+        roomBoardId: '',
+        screens: [],
+        showRecentCalls: true,
+        showTime: true,
+        template: 'classic',
+        voiceEnabled: true,
+      })}::jsonb,
+      NOW()
+    )
+    ON CONFLICT ("id") DO NOTHING
+  `;
+
   console.log('Seed данные добавлены!');
 }
 

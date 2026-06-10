@@ -91,7 +91,7 @@ export class QueueController {
 
   @Get('board/:roomId')
   getBoardByRoom(@Param('roomId') roomId: string) {
-    return this.queueService.getBoardDataByRoom(+roomId);
+    return this.queueService.getBoardDataByRoom(roomId);
   }
 
 }

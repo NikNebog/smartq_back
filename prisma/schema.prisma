@@ -168,6 +168,14 @@ model BoardScreen {
   @@map("board_screens")
 }
 
+model BoardSettings {
+  id        Int      @id @default(1)
+  settings  Json
+  updatedAt DateTime @updatedAt
+
+  @@map("board_settings")
+}
+
 model Terminal {
   id             Int      @id @default(autoincrement())
   name           String

@@ -13,6 +13,8 @@ import { UsersController } from './users/users.controller';
 import { UsersModule } from './users/users.module';
 import { BoardScreensModule } from './board-screens/board-screens.module';
 import { TerminalsModule } from './terminals/terminals.module';
+import { BoardSettingsModule } from './board-settings/board-settings.module';
+import { AppSettingsModule } from './app-settings/app-settings.module';
 
 @Module({
   imports: [
@@ -29,6 +31,8 @@ import { TerminalsModule } from './terminals/terminals.module';
     UsersModule,
     BoardScreensModule,
     TerminalsModule,
+    BoardSettingsModule,
+    AppSettingsModule,
   ],
   controllers: [UsersController],
 })
