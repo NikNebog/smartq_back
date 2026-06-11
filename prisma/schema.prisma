@@ -111,7 +111,7 @@ model RoomServiceType {
 
 model Ticket {
   id              Int           @id @default(autoincrement())
-  number          String        @unique  // например "A001"
+  number          String        // например "A001"
   priority        Int           @default(1)  // 1-5
   isCritical      Boolean       @default(false)
   language        String?       // например "ru", "kk", "en"
@@ -125,12 +125,14 @@ model Ticket {
   room            Room?         @relation(fields: [roomId], references: [id])
 
   createdAt         DateTime   @default(now())
+  businessDate      DateTime   @default(dbgenerated("CURRENT_DATE")) @db.Date
   calledAt          DateTime?
   serviceStartedAt  DateTime?
   completedAt       DateTime?
 
   events  QueueEvent[]
 
+  @@unique([number, businessDate])
   @@map("tickets")
 }
 

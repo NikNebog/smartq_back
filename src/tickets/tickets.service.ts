@@ -32,6 +32,8 @@ export class TicketsService {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
 
     let number: string;
     let attempts = 0;
@@ -44,10 +46,15 @@ export class TicketsService {
       number = `${prefix}${String(count + 1 + attempts).padStart(3, '0')}`;
       attempts++;
 
-      const exists = await this.prisma.ticket.findFirst({ where: { number } });
+      const exists = await this.prisma.ticket.findFirst({
+        where: {
+          number,
+          createdAt: { gte: today, lt: tomorrow },
+        },
+      });
 
       if (!exists) break;
-    } while (attempts < 100);
+    } while (attempts < 1000);
 
     return number;
   }
