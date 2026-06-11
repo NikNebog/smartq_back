@@ -71,6 +71,8 @@ model User {
 model ServiceType {
   id                      Int      @id @default(autoincrement())
   name                    String   @unique
+  nameKk                  String?
+  nameEn                  String?
   averageDurationMinutes  Int
   priorityWeight          Int      @default(1)
   active                  Boolean  @default(true)
