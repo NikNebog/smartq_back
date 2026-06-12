@@ -302,7 +302,7 @@ export class QueueService {
     return this.prisma.ticket.findFirst({
       where: {
         roomId,
-        status: 'waiting',
+        status: { in: ['waiting', 'redirected'] },
       },
       include: { serviceType: true },
       orderBy: [

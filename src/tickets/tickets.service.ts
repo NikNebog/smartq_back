@@ -232,13 +232,17 @@ export class TicketsService {
   }
 
   async callTicket(id: number) {
+    const currentTicket = await this.prisma.ticket.findUnique({
+      where: { id },
+      select: { status: true },
+    });
     const ticket = await this.prisma.ticket.update({
       where: { id },
       data: { status: 'called', calledAt: new Date() },
       include: { room: true },
     });
     await this.prisma.queueEvent.create({
-      data: { ticketId: id, eventType: 'ticket_called', oldStatus: 'waiting', newStatus: 'called' },
+      data: { ticketId: id, eventType: 'ticket_called', oldStatus: currentTicket?.status ?? 'waiting', newStatus: 'called' },
     });
     this.realtime.sendTicketCalled(ticket.number, ticket.room?.name ?? '');
     this.realtime.sendStatusUpdate(ticket.number, 'called', ticket.room?.name ?? '');
