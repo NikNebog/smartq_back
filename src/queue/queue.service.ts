@@ -378,7 +378,6 @@ export class QueueService {
       where: {
         OR: [
           { status: { in: ['called', 'in_service'] } },
-          { calledAt: { not: null } },
           { status: 'completed', completedAt: { gte: today } },
         ],
       },

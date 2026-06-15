@@ -214,6 +214,37 @@ export class TicketsService {
   }
 
   async findAll(status?: TicketStatus, roomId?: number) {
+    if (!status || String(status) === 'postponed') {
+      return this.prisma.$queryRaw`
+        SELECT
+          t.*,
+          CASE WHEN st."id" IS NULL THEN NULL ELSE json_build_object(
+            'id', st."id",
+            'name', st."name",
+            'nameKk', st."nameKk",
+            'nameEn', st."nameEn",
+            'averageDurationMinutes', st."averageDurationMinutes",
+            'priorityWeight', st."priorityWeight",
+            'active', st."active"
+          ) END AS "serviceType",
+          CASE WHEN r."id" IS NULL THEN NULL ELSE json_build_object(
+            'id', r."id",
+            'name', r."name",
+            'isActive', r."isActive",
+            'ticketIssueEnabled', r."ticketIssueEnabled",
+            'placeType', r."placeType",
+            'workingStartTime', r."workingStartTime",
+            'workingEndTime', r."workingEndTime"
+          ) END AS "room"
+        FROM "tickets" t
+        LEFT JOIN "service_types" st ON st."id" = t."serviceTypeId"
+        LEFT JOIN "rooms" r ON r."id" = t."roomId"
+        WHERE (${status ? String(status) : null}::text IS NULL OR t."status"::text = ${status ? String(status) : null}::text)
+          AND (${roomId ?? null}::int IS NULL OR t."roomId" = ${roomId ?? null}::int)
+        ORDER BY t."createdAt" DESC
+      `;
+    }
+
     return this.prisma.ticket.findMany({
       where: {
         ...(status ? { status } : {}),
@@ -289,30 +320,127 @@ export class TicketsService {
   }
 
   async noShowTicket(id: number) {
+    const currentTicket = await this.prisma.ticket.findUnique({
+      where: { id },
+      select: { status: true },
+    });
     const ticket = await this.prisma.ticket.update({
       where: { id },
       data: { status: 'no_show' },
       include: { room: true },
     });
     await this.prisma.queueEvent.create({
-      data: { ticketId: id, eventType: 'ticket_cancelled', oldStatus: 'called', newStatus: 'no_show' },
+      data: { ticketId: id, eventType: 'ticket_cancelled', oldStatus: currentTicket?.status ?? 'called', newStatus: 'no_show' },
     });
     this.realtime.sendStatusUpdate(ticket.number, 'no_show', ticket.room?.name ?? '');
     return ticket;
   }
 
-async returnTicket(id: number) {
-  const ticket = await this.prisma.ticket.update({
-    where: { id },
-    data: { status: 'waiting' },
-    include: { room: true },
-  });
-  await this.prisma.queueEvent.create({
-    data: { ticketId: id, eventType: 'patient_arrived', oldStatus: 'no_show', newStatus: 'waiting' },
-  });
-  this.realtime.sendStatusUpdate(ticket.number, 'waiting', ticket.room?.name ?? '');
-  return ticket;
-}
+  async postponeTicket(id: number) {
+    const currentTicket = await this.prisma.ticket.findUnique({
+      where: { id },
+      select: { status: true },
+    });
+
+    if (!currentTicket || !['called', 'in_service'].includes(currentTicket.status)) {
+      throw new BadRequestException('Отложить можно только вызванный талон или талон в обслуживании.');
+    }
+
+    const [ticket] = await this.prisma.$queryRaw<Array<any>>`
+      UPDATE "tickets"
+      SET "status" = 'postponed'::"TicketStatus"
+      WHERE "id" = ${id}
+      RETURNING *
+    `;
+
+    const [ticketWithRelations] = await this.prisma.$queryRaw<Array<any>>`
+      SELECT
+        t.*,
+        CASE WHEN st."id" IS NULL THEN NULL ELSE json_build_object(
+          'id', st."id",
+          'name', st."name",
+          'nameKk', st."nameKk",
+          'nameEn', st."nameEn",
+          'averageDurationMinutes', st."averageDurationMinutes",
+          'priorityWeight', st."priorityWeight",
+          'active', st."active"
+        ) END AS "serviceType",
+        CASE WHEN r."id" IS NULL THEN NULL ELSE json_build_object(
+          'id', r."id",
+          'name', r."name",
+          'isActive', r."isActive",
+          'ticketIssueEnabled', r."ticketIssueEnabled",
+          'placeType', r."placeType",
+          'workingStartTime', r."workingStartTime",
+          'workingEndTime', r."workingEndTime"
+        ) END AS "room"
+      FROM "tickets" t
+      LEFT JOIN "service_types" st ON st."id" = t."serviceTypeId"
+      LEFT JOIN "rooms" r ON r."id" = t."roomId"
+      WHERE t."id" = ${id}
+      LIMIT 1
+    `;
+
+    await this.prisma.$executeRaw`
+      INSERT INTO "queue_events" ("ticketId", "eventType", "oldStatus", "newStatus", "payload", "createdAt")
+      VALUES (
+        ${id},
+        'ticket_postponed'::"EventType",
+        ${currentTicket.status}::"TicketStatus",
+        'postponed'::"TicketStatus",
+        ${JSON.stringify({
+          roomId: ticket.roomId,
+          ticketId: ticket.id,
+          ticketNumber: ticket.number,
+        })}::jsonb,
+        NOW()
+      )
+    `;
+
+    this.realtime.sendStatusUpdate(ticketWithRelations.number, 'postponed', ticketWithRelations.room?.name ?? '');
+    return ticketWithRelations;
+  }
+
+  async returnTicket(id: number) {
+    const [currentTicket] = await this.prisma.$queryRaw<Array<{ status: string }>>`
+      SELECT "status"::text AS "status"
+      FROM "tickets"
+      WHERE "id" = ${id}
+      LIMIT 1
+    `;
+    const isPostponedTicket = currentTicket?.status === 'postponed';
+    const nextStatus = isPostponedTicket ? 'in_service' : 'waiting';
+
+    const ticket = await this.prisma.ticket.update({
+      where: { id },
+      data: {
+        status: nextStatus as any,
+        calledAt: isPostponedTicket ? undefined : null,
+        serviceStartedAt: isPostponedTicket ? new Date() : null,
+        completedAt: null,
+      },
+      include: { room: true, serviceType: true },
+    });
+
+    await this.prisma.$executeRaw`
+      INSERT INTO "queue_events" ("ticketId", "eventType", "oldStatus", "newStatus", "payload", "createdAt")
+      VALUES (
+        ${id},
+        'patient_arrived'::"EventType",
+        ${currentTicket?.status ?? 'no_show'}::"TicketStatus",
+        ${nextStatus}::"TicketStatus",
+        ${JSON.stringify({
+          roomId: ticket.roomId,
+          ticketId: ticket.id,
+          ticketNumber: ticket.number,
+        })}::jsonb,
+        NOW()
+      )
+    `;
+
+    this.realtime.sendStatusUpdate(ticket.number, nextStatus, ticket.room?.name ?? '');
+    return ticket;
+  }
 
   async redirectTicket(id: number, newRoomId: number) {
     const ticket = await this.prisma.ticket.update({

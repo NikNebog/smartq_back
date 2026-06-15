@@ -97,6 +97,38 @@ function createPrismaMock() {
     $queryRaw: jest.fn((strings: TemplateStringsArray, ...values: unknown[]) => {
       const sql = strings.join('?');
 
+      if (sql.includes('UPDATE "tickets"')) {
+        const id = values[0] as number;
+        const ticket = tickets.find((item) => item.id === id);
+
+        if (!ticket) {
+          return Promise.resolve([]);
+        }
+
+        ticket.status = 'postponed';
+
+        return Promise.resolve([ticket]);
+      }
+
+      if (sql.includes('FROM "tickets"')) {
+        const id = values[0] as number;
+        const statusRoomId = values[0] as number | null;
+        const roomId = values[1] as number | null;
+
+        if (sql.includes('WHERE t."id"')) {
+          const ticket = tickets.find((item) => item.id === id);
+
+          return Promise.resolve(ticket ? [withRelations(ticket)] : []);
+        }
+
+        return Promise.resolve(
+          tickets
+            .filter((ticket) => ticket.status === 'postponed')
+            .filter((ticket) => statusRoomId == null || ticket.roomId === roomId)
+            .map(withRelations),
+        );
+      }
+
       if (sql.includes('FROM "rooms"')) {
         const roomId = values[0] as number;
         const serviceTypeId = values[1] as number;
@@ -143,6 +175,7 @@ function createPrismaMock() {
 
       return Promise.resolve([]);
     }),
+    $executeRaw: jest.fn(() => Promise.resolve(1)),
     queueEvent: {
       create: jest.fn(({ data }) => {
         queueEvents.push(data);
@@ -188,6 +221,19 @@ function createPrismaMock() {
           })[0];
 
         return Promise.resolve(found ? withRelations(found) : null);
+      }),
+      findMany: jest.fn(({ where, orderBy } = {}) => {
+        const found = [...tickets]
+          .filter((ticket) => matchesTicketWhere(ticket, where))
+          .sort((left, right) => {
+            if (orderBy?.createdAt === 'desc') {
+              return right.createdAt.getTime() - left.createdAt.getTime();
+            }
+
+            return left.createdAt.getTime() - right.createdAt.getTime();
+          });
+
+        return Promise.resolve(found.map(withRelations));
       }),
       findUnique: jest.fn(({ where }) => {
         const found = tickets.find((ticket) => ticket.id === where.id);
@@ -298,6 +344,65 @@ describe('Queue flow (e2e)', () => {
       .expect(({ body }) => {
         expect(body.status).toBe('called');
         expect(body.calledAt).toBeTruthy();
+      });
+  });
+
+  it('postpones called ticket and returns it to waiting queue', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/tickets/kiosk')
+      .send({ priority: 1, roomId: 21, serviceTypeId: 27 })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`/tickets/${created.body.id}/call`)
+      .expect(201)
+      .expect(({ body }) => {
+        expect(body.status).toBe('called');
+      });
+
+    await request(app.getHttpServer())
+      .post(`/tickets/${created.body.id}/postpone`)
+      .expect(201)
+      .expect(({ body }) => {
+        expect(body.status).toBe('postponed');
+        expect(body.roomId).toBe(21);
+      });
+
+    await request(app.getHttpServer())
+      .get('/queue/room/21/next')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toEqual({});
+      });
+
+    await request(app.getHttpServer())
+      .get('/tickets?roomId=21&status=postponed')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toEqual([
+          expect.objectContaining({
+            id: created.body.id,
+            status: 'postponed',
+          }),
+        ]);
+      });
+
+    await request(app.getHttpServer())
+      .post(`/tickets/${created.body.id}/return`)
+      .expect(201)
+      .expect(({ body }) => {
+        expect(body.status).toBe('waiting');
+        expect(body.calledAt).toBeNull();
+        expect(body.serviceStartedAt).toBeNull();
+        expect(body.completedAt).toBeNull();
+      });
+
+    await request(app.getHttpServer())
+      .get('/queue/room/21/next')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.id).toBe(created.body.id);
+        expect(body.status).toBe('waiting');
       });
   });
 

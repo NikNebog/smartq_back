@@ -9,10 +9,22 @@ export class AnalyticsService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const tickets = await this.prisma.ticket.findMany({
-      where: { createdAt: { gte: today } },
-      include: { room: true, serviceType: true },
-    });
+    const tickets = await this.prisma.$queryRaw<Array<any>>`
+      SELECT
+        t.*,
+        CASE WHEN r."id" IS NULL THEN NULL ELSE json_build_object(
+          'id', r."id",
+          'name', r."name"
+        ) END AS "room",
+        CASE WHEN st."id" IS NULL THEN NULL ELSE json_build_object(
+          'id', st."id",
+          'name', st."name"
+        ) END AS "serviceType"
+      FROM "tickets" t
+      LEFT JOIN "rooms" r ON r."id" = t."roomId"
+      LEFT JOIN "service_types" st ON st."id" = t."serviceTypeId"
+      WHERE t."createdAt" >= ${today}
+    `;
 
     const totalTickets = tickets.length;
     const cancelledCount = tickets.filter(t => t.status === 'cancelled').length;

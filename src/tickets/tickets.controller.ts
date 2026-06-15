@@ -58,6 +58,13 @@ export class TicketsController {
     return this.ticketsService.noShowTicket(+id);
   }
 
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles('admin', 'specialist')
+  @Post(':id/postpone')
+  postpone(@Param('id') id: string) {
+    return this.ticketsService.postponeTicket(+id);
+  }
+
 @UseGuards(JwtGuard, RolesGuard)
   @Roles('admin', 'specialist')
   @Post(':id/return')
