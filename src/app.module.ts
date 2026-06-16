@@ -15,6 +15,7 @@ import { BoardScreensModule } from './board-screens/board-screens.module';
 import { TerminalsModule } from './terminals/terminals.module';
 import { BoardSettingsModule } from './board-settings/board-settings.module';
 import { AppSettingsModule } from './app-settings/app-settings.module';
+import { MediaModule } from './media/media.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { AppSettingsModule } from './app-settings/app-settings.module';
     TerminalsModule,
     BoardSettingsModule,
     AppSettingsModule,
+    MediaModule,
   ],
   controllers: [UsersController],
 })

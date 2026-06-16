@@ -205,3 +205,14 @@ model AppSettings {
 
   @@map("app_settings")
 }
+
+// Сюда будут сохраняться видео и фото Рекламы
+model MediaFile {
+  id        Int      @id @default(autoincrement())
+  type      String   // "video" | "image"
+  filename  String
+  url       String
+  createdAt DateTime @default(now())
+
+  @@map("media_files")
+}
